@@ -1,5 +1,7 @@
 import base64
 import os
+import re
+
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -57,26 +59,97 @@ class GmailSearcher:
         return detailed_messages
 
     def extract_message_content(self, message):
-        if "payload" not in message:
-            return ""
-        if "body" in message["payload"]:
-            return base64.urlsafe_b64decode(message["payload"]["body"]["data"]).decode(
-                "utf-8"
-            )
-        elif "parts" in message["payload"]:
-            for part in message["payload"]["parts"]:
-                if part["mimeType"] == "text/plain":
-                    return base64.urlsafe_b64decode(part["body"]["data"]).decode(
-                        "utf-8"
-                    )
-        return ""
+        try:
+            # Attempt to access the 'data' key
+            data = message["payload"]["body"]["data"]
+            return base64.urlsafe_b64decode(data).decode()
+        except KeyError:
+            # If 'data' is not found, check for 'parts'
+            parts = message["payload"].get("parts", [])
+            if parts:
+                for part in parts:
+                    if part["mimeType"] == "text/plain":
+                        data = part["body"]["data"]
+                        return base64.urlsafe_b64decode(data).decode()
+
+            # If no suitable content is found, return an error message
+            return "Unable to extract message content"
+
+    def clean_reply(self, text):
+        return text.strip()
+
+    def _is_garbage_line(self, line):
+        linkedin_garbage_lines = (
+            "This email was intended for",
+            "Get the new LinkedIn",
+            "Also available on mobile",
+            "*Tip:* You can respond to ",
+        )
+        for garbage in linkedin_garbage_lines:
+            if line.startswith(garbage):
+                return True
+        return False
+
+    def clean_quoted_text(self, text):
+        lines = text.splitlines()
+        cleaned_lines = []
+        linkedin_garbage_lines = (
+            "This email was intended for",
+            "Get the new LinkedIn",
+            "Also available on mobile",
+        )
+        for line in lines:
+            line = line.lstrip("> ")
+            line = re.sub(r"<\S+>", "", line)
+            line = re.sub(r"\[image:.*?\]", "", line, flags=re.MULTILINE)
+            line = line.strip()
+            if self._is_garbage_line(line):
+                break
+            if line:
+                cleaned_lines.append(line)
+        return "\n".join(cleaned_lines)
+
+    def split_message(self, content):
+        pattern = r"\nOn .+?(?:\d{1,2}:\d{2}(?: [AP]M)?|\d{4}).*?(?:\S+@\S+|<\S+@\S+>)\s+wrote:"
+        match = re.split(pattern, content, flags=re.DOTALL | re.IGNORECASE)
+        if len(match) > 1:
+            reply_text = self.clean_reply(match[0])
+            quoted_text = self.clean_quoted_text(match[-1])
+        else:
+            reply_text = self.clean_reply(content)
+            quoted_text = ""
+        return reply_text, quoted_text
+
+    def get_subject(self, message):
+        for header in message["payload"]["headers"]:
+            if header["name"].lower() == "subject":
+                return header["value"]
+        return "No Subject"
 
 
 if __name__ == "__main__":
     searcher = GmailSearcher()
     searcher.authenticate()
-    results = searcher.search_and_get_details("label:jobs-2024/recruiter-pings")
-    for msg in results:
-        print(f"Subject: {msg['payload']['headers'][0]['value']}")
-        # print(f"Content: {searcher.extract_message_content(msg)}")
-        print("---")
+    # Search for messages with the specified label and replies from the user
+    query = "label:jobs-2024/recruiter-pings from:me"
+    results = (
+        searcher.service.users()
+        .messages()
+        .list(userId="me", q=query, maxResults=10)
+        .execute()
+    )
+    messages = results.get("messages", [])
+    for msg in messages:
+        print()
+        print("-" * 80)
+        full_msg = searcher.get_message_details(msg["id"])
+
+        subject = searcher.get_subject(full_msg)
+
+        print(f"Subject: {subject}")
+        content = searcher.extract_message_content(full_msg)
+        my_lines, recruiter_lines = searcher.split_message(content)
+        print(f"My lines:\n{my_lines}")
+        print()
+        print(f"Recruiter lines:\n{recruiter_lines}")
+        print()
