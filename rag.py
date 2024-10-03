@@ -55,6 +55,8 @@ class RecruitmentRAG:
         self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
 
     def setup_chain(self):
+        if self.retriever is None:
+            raise ValueError("Data not prepared. Call prepare_data() first.")
         llm = ChatOpenAI(temperature=0.2)
 
         prompt = ChatPromptTemplate.from_template(TEMPLATE)
@@ -67,4 +69,6 @@ class RecruitmentRAG:
         )
 
     def generate_reply(self, new_recruiter_message: str) -> str:
+        if self.chain is None:
+            raise ValueError("Chain not set up. Call setup_chain() first.")
         return self.chain.invoke(new_recruiter_message)
