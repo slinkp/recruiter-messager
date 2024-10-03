@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_anthropic import ChatAnthropic
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -54,10 +55,16 @@ class RecruitmentRAG:
         )
         self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    def setup_chain(self):
+    def setup_chain(self, llm_type: str):
         if self.retriever is None:
             raise ValueError("Data not prepared. Call prepare_data() first.")
-        llm = ChatOpenAI(temperature=0.2)
+
+        if llm_type.lower() == "openai":
+            llm = ChatOpenAI(temperature=0.2)
+        elif llm_type.lower() == "claude":
+            llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0.2)
+        else:
+            raise ValueError("Invalid llm_type. Choose 'openai' or 'claude'.")
 
         prompt = ChatPromptTemplate.from_template(TEMPLATE)
 

@@ -3,7 +3,7 @@ from client import GmailSearcher
 from rag import RecruitmentRAG
 
 
-def main():
+def main(model: str):
     print("Fetching messages from mail...")
     searcher = GmailSearcher()
     searcher.authenticate()
@@ -16,7 +16,7 @@ def main():
     # Set up the RAG pipeline
     rag = RecruitmentRAG(processed_messages)
     rag.prepare_data()
-    rag.setup_chain()
+    rag.setup_chain(llm_type=model)
     print(f"RAG setup complete")
 
     # Example usage
@@ -38,4 +38,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model", action="store", choices=["openai", "claude"], default="openai"
+    )
+    args = parser.parse_args()
+    main(args.model)
