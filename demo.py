@@ -23,7 +23,7 @@ def load_messages(use_cache: bool = True):
         searcher = GmailSearcher()
         searcher.authenticate()
         query = "label:jobs-2024/recruiter-pings from:me"
-        processed_messages = searcher.get_recruiter_messages(query, max_results=100)
+        processed_messages = searcher.get_recruiter_messages(query, max_results=300)
         print(f"Got messages from mail: {len(processed_messages)}")
         with open(cachefile, "w") as f:
             json.dump(processed_messages, f, indent=2)
