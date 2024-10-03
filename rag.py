@@ -10,6 +10,25 @@ from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
+TEMPLATE = """You are an AI assistant helping to generate replies to recruiter messages
+based on previous interactions.
+Use the following pieces of context to generate a reply to the recruiter message.
+The reply should be professional, courteous, and in a similar style to the previous replies.
+If the recruiter message provides specific information that is an especially good match for
+most or all the criteria that previous context has indicated the candidate wants,
+then the tone should be more excited.
+To clarify the criteria: no compensation is too high, but decline opportunities
+with compensation that is too low.
+Otherwise, be specific about criteria that are not met, including dollar amounts for
+compensation.
+
+Context: {context}
+
+Recruiter Message: {question}
+
+Generated Reply:"""
+
+
 class RecruitmentRAG:
     def __init__(self, messages: List[Tuple[str, str, str]]):
         self.messages = messages
@@ -37,22 +56,7 @@ class RecruitmentRAG:
     def setup_chain(self):
         llm = ChatOpenAI(temperature=0.2)
 
-        template = """You are an AI assistant helping to generate replies to recruiter messages
-        based on previous interactions. 
-        Use the following pieces of context to generate a reply to the recruiter message. 
-        The reply should be professional, courteous, and in a similar style to the previous replies.
-        If the recruiter message provides specific information that is an especially good match for 
-        most orall the criteria that previous context has indicated the candidate wants,
-        then the tone should be more excited.
-        Otherwise, be specific about criteria that are not met, including dollar amounts for compensation.
-
-        Context: {context}
-
-        Recruiter Message: {question}
-
-        Generated Reply:"""
-
-        prompt = ChatPromptTemplate.from_template(template)
+        prompt = ChatPromptTemplate.from_template(TEMPLATE)
 
         self.chain = (
             {"context": self.retriever, "question": RunnablePassthrough()}
