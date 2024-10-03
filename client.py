@@ -42,8 +42,13 @@ class GmailSearcher:
                 token.write(self.creds.to_json())
         self.service = build("gmail", "v1", credentials=self.creds)
 
-    def search_messages(self, query):
-        results = self.service.users().messages().list(userId="me", q=query).execute()
+    def search_messages(self, query, max_results: int = 10) -> list:
+        results = (
+            self.service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=max_results)
+            .execute()
+        )
         messages = results.get("messages", [])
         return messages
 
@@ -51,11 +56,9 @@ class GmailSearcher:
         message = self.service.users().messages().get(userId="me", id=msg_id).execute()
         return message
 
-    def search_and_get_details(self, query):
-        messages = self.search_messages(query)
-        detailed_messages = []
-        for msg in messages:
-            detailed_messages.append(self.get_message_details(msg["id"]))
+    def search_and_get_details(self, query, max_results: int = 10):
+        messages = self.search_messages(query, max_results)
+        detailed_messages = [self.get_message_details(msg["id"]) for msg in messages]
         return detailed_messages
 
     def extract_message_content(self, message):
@@ -76,7 +79,11 @@ class GmailSearcher:
             return "Unable to extract message content"
 
     def clean_reply(self, text):
-        return text.strip()
+        text = text.strip()
+        if len(text) < 30:
+            # Heuristic for stuff like 'replied on linkedin'
+            return ""
+        return text
 
     def _is_garbage_line(self, line):
         linkedin_garbage_lines = (
@@ -93,11 +100,6 @@ class GmailSearcher:
     def clean_quoted_text(self, text):
         lines = text.splitlines()
         cleaned_lines = []
-        linkedin_garbage_lines = (
-            "This email was intended for",
-            "Get the new LinkedIn",
-            "Also available on mobile",
-        )
         for line in lines:
             line = line.lstrip("> ")
             line = re.sub(r"<\S+>", "", line)
@@ -129,20 +131,45 @@ class GmailSearcher:
     def get_recruiter_messages(
         self, query: str, max_results: int = 10
     ) -> List[Tuple[str, str, str]]:
-        results = (
-            self.service.users()
-            .messages()
-            .list(userId="me", q=query, maxResults=max_results)
-            .execute()
-        )
-        messages = results.get("messages", [])
+        results = self.search_and_get_details(query, max_results)
+        print(f"Got {len(results)} messages")
         processed_messages = []
 
-        for msg in messages:
-            full_msg = self.get_message_details(msg["id"])
+        for full_msg in results:
             subject = self.get_subject(full_msg)
             content = self.extract_message_content(full_msg)
+            date = full_msg["internalDate"]
             my_reply, recruiter_message = self.split_message(content)
-            processed_messages.append((subject, recruiter_message, my_reply))
+            if my_reply and recruiter_message:
+                processed_messages.append(
+                    (date, (subject, recruiter_message, my_reply))
+                )
+            else:
+                print(f"Skipping message with no useful content: {subject}")
 
-        return processed_messages
+        processed_messages.sort(reverse=True)
+        return [msg for _, msg in processed_messages]
+
+
+if __name__ == "__main__":
+    searcher = GmailSearcher()
+    searcher.authenticate()
+    query = "label:jobs-2024/recruiter-pings from:me"
+    processed_messages = searcher.get_recruiter_messages(query, max_results=10)
+    processed_messages = processed_messages[:3]
+    import textwrap
+
+    term_width = 75
+    max_lines = 4
+    for subject, recruiter_message, my_reply in processed_messages:
+        subject = textwrap.fill(subject, width=term_width)
+        recruiter_message = textwrap.fill(
+            recruiter_message, width=term_width, max_lines=max_lines
+        )
+        my_reply = textwrap.fill(my_reply, width=term_width, max_lines=max_lines)
+        print(f"Subject: {subject}")
+        print(f"\nRecruiter Message:\n{recruiter_message}")
+        print(f"\nMy Reply:\n{my_reply}")
+        print()
+        print("-" * term_width)
+        print()

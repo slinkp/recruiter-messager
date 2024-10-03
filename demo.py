@@ -8,7 +8,7 @@ def main():
 
     # Fetch recruiter messages and your replies
     query = "label:jobs-2024/recruiter-pings from:me"
-    processed_messages = searcher.get_recruiter_messages(query)
+    processed_messages = searcher.get_recruiter_messages(query, max_results=100)
 
     # Set up the RAG pipeline
     rag = RecruitmentRAG(processed_messages)
