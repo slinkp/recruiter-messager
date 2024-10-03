@@ -14,7 +14,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 TEMPLATE = """You are an AI assistant helping to generate replies to recruiter messages
 based on previous interactions.
 Use the following pieces of context to generate a reply to the recruiter message.
-The reply should be professional, courteous, and in a similar style to the previous replies.
+The reply should be professional, courteous, and in a similar style and length 
+to the previous context.
+Assume that this is my first reply to this particular recruiter.
 If the recruiter message provides specific information that is an especially good match for
 most or all the criteria that previous context has indicated the candidate wants,
 then the tone should be more excited.
@@ -23,6 +25,14 @@ compensation.
 To clarify the criteria: Decline opportunities with compensation that is too low, but do
 not decline if compensation is higher than the minimum from previous context.
 Higher is better and no amount is too high!
+
+To clarify the style: Be concise. Do not use bullet points. Avoid redundancy.
+Do not be apologetic.
+
+Additional constraints on generated reply content:
+Do greet the recruiter by name, but only if their message includes a name, otherwise generated names
+may be from previous messages to/from other recruiters and inappropriate for this message.
+If mentioning my previous roles by title, only mention the staff developer role.
 
 Context: {context}
 
