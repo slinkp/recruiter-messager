@@ -46,6 +46,8 @@ Generated Reply:"""
 
 class RecruitmentRAG:
     def __init__(self, messages: List[Tuple[str, str, str]]):
+        if len(messages) == 0:
+            raise ValueError("No messages provided")
         self.messages = messages
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200
