@@ -1,6 +1,6 @@
 import os.path
 import textwrap
-import pickle
+import json
 from client import GmailSearcher
 from rag import RecruitmentRAG
 
@@ -8,12 +8,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def load_messages(use_cache: bool = True):
-    cachefile = os.path.join(HERE, "processed_messages.pkl")
+
+    cachefile = os.path.join(HERE, "processed_messages.json")
     processed_messages = []
     if use_cache:
         try:
-            with open(cachefile, "rb") as f:
-                processed_messages = pickle.load(f)
+            with open(cachefile, "r") as f:
+                processed_messages = json.load(f)
                 print(f"Loaded {len(processed_messages)} messages from cache")
         except FileNotFoundError:
             print("No cache found, rebuilding...")
@@ -24,8 +25,8 @@ def load_messages(use_cache: bool = True):
         query = "label:jobs-2024/recruiter-pings from:me"
         processed_messages = searcher.get_recruiter_messages(query, max_results=100)
         print(f"Got messages from mail: {len(processed_messages)}")
-        with open(cachefile, "wb") as f:
-            pickle.dump(processed_messages, f)
+        with open(cachefile, "w") as f:
+            json.dump(processed_messages, f, indent=2)
 
     return processed_messages
 
