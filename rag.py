@@ -17,10 +17,11 @@ The reply should be professional, courteous, and in a similar style to the previ
 If the recruiter message provides specific information that is an especially good match for
 most or all the criteria that previous context has indicated the candidate wants,
 then the tone should be more excited.
-To clarify the criteria: no compensation is too high, but decline opportunities
-with compensation that is too low.
 Otherwise, be specific about criteria that are not met, including dollar amounts for
 compensation.
+To clarify the criteria: Decline opportunities with compensation that is too low, but do
+not decline if compensation is higher than the minimum from previous context.
+Higher is better and no amount is too high!
 
 Context: {context}
 
