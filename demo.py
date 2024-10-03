@@ -1,19 +1,23 @@
+import textwrap
 from client import GmailSearcher
 from rag import RecruitmentRAG
 
 
 def main():
+    print("Fetching messages from mail...")
     searcher = GmailSearcher()
     searcher.authenticate()
 
     # Fetch recruiter messages and your replies
     query = "label:jobs-2024/recruiter-pings from:me"
     processed_messages = searcher.get_recruiter_messages(query, max_results=100)
+    print(f"Got messages from mail: {len(processed_messages)}")
 
     # Set up the RAG pipeline
     rag = RecruitmentRAG(processed_messages)
     rag.prepare_data()
     rag.setup_chain()
+    print(f"RAG setup complete")
 
     # Example usage
     demo_messages = (
@@ -23,7 +27,6 @@ def main():
         "Hey Paul! Come work for me in San Francisco!",
         "I have a permanent role open for a senior staff python backend developer who wants to learn AI. It pays $999k. The company is well established, public, and is in NYC",
     )
-    import textwrap
 
     for new_recruiter_message in demo_messages:
         generated_reply = rag.generate_reply(new_recruiter_message)
