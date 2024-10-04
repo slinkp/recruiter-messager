@@ -48,6 +48,7 @@ Generated Reply:"""
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
 
+
 class RecruitmentRAG:
     def __init__(self, messages: List[Tuple[str, str, str]]):
         if len(messages) == 0:
