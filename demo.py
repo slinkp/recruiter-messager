@@ -36,7 +36,7 @@ def main(model: str, limit: int, use_cache: bool = True):
 
     # Set up the RAG pipeline
     rag = RecruitmentRAG(processed_messages)
-    rag.prepare_data()
+    rag.prepare_data(clear_existing=not use_cache)
     rag.setup_chain(llm_type=model)
     print(f"RAG setup complete")
 

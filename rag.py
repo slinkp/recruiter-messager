@@ -7,8 +7,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_anthropic import ChatAnthropic
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
 
 TEMPLATE = """You are an AI assistant helping to generate replies to recruiter messages
@@ -45,6 +46,9 @@ Recruiter Message: {question}
 Generated Reply:"""
 
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(HERE, "data")
+
 class RecruitmentRAG:
     def __init__(self, messages: List[Tuple[str, str, str]]):
         if len(messages) == 0:
@@ -53,22 +57,40 @@ class RecruitmentRAG:
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200
         )
-        self.embeddings = OpenAIEmbeddings()
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
         self.vectorstore = None
         self.retriever = None
         self.chain = None
 
-    def prepare_data(self):
+    def make_replies_vector_db(self, clear_existing: bool = False):
+        collection_name = "recruiter-replies"
+        vectorstore = Chroma(
+            collection_name=collection_name,
+            embedding_function=self.embeddings,
+            persist_directory=DATA_DIR,
+        )
+        # Only add the documents to the vectorstore if it's empty
+        has_data = bool(vectorstore.get(limit=1, include=[])["ids"])
+        if has_data and not clear_existing:
+            print(f"Loaded vector store for {collection_name}")
+            return vectorstore
+
+        if clear_existing:
+            vectorstore.reset_collection()
+
         documents = []
         for subject, recruiter_message, my_reply in self.messages:
-            documents.append(
-                f"Subject: {subject}\nRecruiter: {recruiter_message}\nMy Reply: {my_reply}"
-            )
+            text = f"Subject: {subject}\nRecruiter: {recruiter_message}\nMy Reply: {my_reply}"
+            documents.append(Document(page_content=text))
 
-        split_docs = self.text_splitter.create_documents(documents)
-        self.vectorstore = Chroma.from_documents(
-            documents=split_docs, embedding=self.embeddings
-        )
+        print(f"Adding initial documents to the vector store from split data")
+
+        split_docs = self.text_splitter.split_documents(documents)
+        vectorstore.add_documents(split_docs)
+        return vectorstore
+
+    def prepare_data(self, clear_existing: bool = False):
+        self.vectorstore = self.make_replies_vector_db(clear_existing=clear_existing)
         self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
 
     def setup_chain(self, llm_type: str):
