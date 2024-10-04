@@ -1,7 +1,7 @@
 import os.path
 import textwrap
 import json
-from client import GmailSearcher
+from email_client import GmailSearcher
 from rag import RecruitmentRAG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
