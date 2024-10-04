@@ -16,17 +16,15 @@ TEMPLATE = """You are an AI assistant helping to generate replies to recruiter m
 based on previous interactions.
 Use the following pieces of context to generate a reply to the recruiter message.
 The reply should be professional, courteous, and in a similar style and length 
-to the previous context.
-
-Additional constraints on style:
+to the previous context. 
+Also observe these additional constraints on style:
 - Be concise. 
 - Do not use bullet points. 
 - Avoid redundancy.
 - Do not be apologetic.
 - Do not exceed 100 words.
 - Don't use superlatives.
-
-Additional constraints on generated content:
+Also observe these additional constraints on generated content:
 - Assume that this is my first reply to this particular recruiter.
 - If the recruiter message provides specific information that is an especially good match for
   most or all the criteria that previous context has indicated the candidate wants,
@@ -38,6 +36,7 @@ Additional constraints on generated content:
 - If declining because of other criteria, be specific about the criteria that are not met.
 - If mentioning my previous roles by title, only mention the staff developer role.
 - If they require full stack or javascript, mention that those aren't my strengths.
+- Desired locations are NYC (New York City), or remote. No relocations.
 
 Context: {context}
 
