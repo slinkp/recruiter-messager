@@ -128,7 +128,7 @@ class GmailSearcher:
                 return header["value"]
         return "No Subject"
 
-    def get_recruiter_messages(
+    def get_recruiter_replies(
         self, query: str, max_results: int = 10
     ) -> List[Tuple[str, str, str]]:
         results = self.search_and_get_details(query, max_results)
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     searcher = GmailSearcher()
     searcher.authenticate()
     query = "label:jobs-2024/recruiter-pings from:me"
-    processed_messages = searcher.get_recruiter_messages(query, max_results=10)
+    processed_messages = searcher.get_recruiter_replies(query, max_results=10)
     processed_messages = processed_messages[:3]
     import textwrap
 
