@@ -36,6 +36,7 @@ Additional constraints on generated content:
   total compensation based on the Shopify example.
 - If declining because of other criteria, be specific about the criteria that are not met.
 - If mentioning my previous roles by title, only mention the staff developer role.
+- If they require full stack or javascript, mention that those aren't my strengths.
 
 Context: {context}
 
