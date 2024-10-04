@@ -37,9 +37,34 @@ techniques on a practical problem I actually have, absolutely!
 
 Trained on my previous replies, and running against hand-written synthetic
 recruiter messages, it's pretty inconsistent so far.
-Here's some not-terrible output:
+But here's some not-terrible output:
 
-```
+```console
+$ python demo.py --model=claude
+Loaded 106 messages from cache
+RAG setup complete
+--------------------------------------------------------------------------------
+
+New Recruiter Message (demo):
+ I have a permanent role open for a senior staff python backend
+developer who wants to learn AI. It pays $999k. The company is well
+established, public, and is in NYC
+
+Generated Reply:
+ Hi there,  Thank you for reaching out with this exciting opportunity!
+The role you've described aligns perfectly with my interests and
+experience as a staff developer. I'm particularly intrigued by the
+chance to learn AI while working on backend Python development.  The
+compensation package is extremely attractive, and I appreciate that
+it's a permanent position with a well-established public company. I'd
+be very interested in learning more about the specific
+responsibilities and challenges of the role.  Could we schedule a call
+to discuss further details? I look forward to hearing from you.  Best
+regards, Paul
+
+
+--------------------------------------------------------------------------------
+
 New Recruiter Message (demo):
  Hey Paul! Come work for me in San Francisco! Regards, Jobby McJobface
 
@@ -49,23 +74,60 @@ Francisco. While I appreciate your interest, I'm currently only
 considering positions in NYC or fully remote roles. My experience as a
 staff developer might be valuable to your team, but the location
 doesn't align with my current preferences. If you have any remote
-opportunities that match my background, I'd be happy to learn more.
-Best regards, Paul
-```
+opportunities that match my skills, I'd be happy to learn more.  Best
+regards, Paul
 
-```
+
+--------------------------------------------------------------------------------
+
 New Recruiter Message (demo):
  Hi are you available for a call tomorrow? I have a great opportunity
 for a junior full stack engineer.
 
 Generated Reply:
  Hi there,  Thank you for reaching out. I appreciate the opportunity,
-but I'm not currently seeking junior or full stack roles. With 24
-years of experience and having held a staff developer position, I'm
-focusing on senior or staff-level backend engineering roles.
-Additionally, my expertise isn't in full stack or JavaScript
-development.  I'm open to opportunities in NYC or fully remote, with
-compensation comparable to my previous role at Shopify (*REDACTED* total
-annual). If you have any positions matching these criteria, I'd be
-happy to discuss further.  Best regards, Paul
+but I'm not a good fit for a junior full stack role. I have 24 years
+of experience and was most recently in a staff developer position.
+Additionally, full stack development isn't my primary focus.   I'm
+open to senior or staff-level backend engineering roles in NYC or
+fully remote, with compensation comparable to my previous position at
+Shopify (**REDACTED** annual). If you have any opportunities matching
+these criteria, I'd be happy to discuss further.  Best regards, Paul
+
+
+--------------------------------------------------------------------------------
+
+New Recruiter Message (demo):
+ Hello, would you be interested in a contract position? It pays $35 per
+hour.
+
+Generated Reply:
+ Hello,  Thank you for reaching out about this opportunity.
+Unfortunately, the compensation for this contract position is not in
+line with my current expectations. For reference, I was previously
+earning **REDACTED** total annual compensation at Shopify. Given my 24 years
+of experience as a staff developer, I'm primarily focusing on roles at
+established tech companies that can offer competitive compensation and
+responsibilities. If you have any positions that might better align
+with my background and expectations, please let me know.  Best
+regards, Paul
+
+
+--------------------------------------------------------------------------------
+
+New Recruiter Message (demo):
+ Hi there! I came across your profile and was impressed by your
+experience. We have an exciting opportunity for a Senior Software
+Engineer position. Would you be interested in learning more?
+
+Generated Reply:
+ Hello,  Thank you for reaching out about the Senior Software Engineer
+position. I'm interested in learning more about the role and company.
+Could you provide details on the challenges, responsibilities, and
+compensation? I've been focusing on staff-level backend roles at
+established tech companies. For reference, my previous total annual
+compensation at Shopify was **REDACTED**. Please let me know if this aligns
+with your offering. I look forward to hearing more.  Best regards,
+Paul
 ```
+

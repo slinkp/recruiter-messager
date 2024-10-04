@@ -43,7 +43,7 @@ def main(model: str, limit: int, use_cache: bool = True):
     # Example usage
     demo_messages = [
         "Hi there! I came across your profile and was impressed by your experience. We have an exciting opportunity for a Senior Software Engineer position. Would you be interested in learning more?",
-        "Hello, would you be interested in a contract position? It pays $75 per hour.",
+        "Hello, would you be interested in a contract position? It pays $35 per hour.",
         "Hi are you available for a call tomorrow? I have a great opportunity for a junior full stack engineer.",
         "Hey Paul! Come work for me in San Francisco! Regards, Jobby McJobface",
         "I have a permanent role open for a senior staff python backend developer who wants to learn AI. It pays $999k. The company is well established, public, and is in NYC",
