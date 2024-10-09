@@ -7,6 +7,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.exceptions import RefreshError
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUTH_DIR = os.path.join(HERE, "secrets")
@@ -32,8 +33,12 @@ class GmailSearcher:
             self.creds = Credentials.from_authorized_user_file(TOKEN_FILE, self.SCOPES)
         if not (self.creds and self.creds.valid):
             if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-            else:
+                try:
+                    self.creds.refresh(Request())
+                except RefreshError:
+                    # Token is invalid, so we need to re-authenticate
+                    self.creds = None
+            if not self.creds or not self.creds.valid:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     CREDENTIALS_FILE, self.SCOPES
                 )
