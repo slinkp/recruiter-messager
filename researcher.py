@@ -42,25 +42,72 @@ from langchain_chroma import Chroma
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+from langchain_anthropic import ChatAnthropic
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
+from typing import Optional, Literal, List
+from pydantic import BaseModel, Field, field_validator
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
 
 logger = logging.getLogger(__name__)
 
+
+class CompanyInfo(BaseModel):
+    model_config = {
+        "strict": True,
+        "extra": "forbid",
+    }
+
+    company: Optional[str] = Field(description="The name of the company")
+    funding_status: Optional[
+        Literal["public", "private", "unicorn", "private finance"]
+    ] = Field(description="The funding status of the company")
+    mission: Optional[str] = Field(description="The mission of the company")
+    work_policy: Optional[Literal["remote", "hybrid", "onsite"]] = Field(
+        description="The work policy of the company"
+    )
+    total_employees: Optional[int] = Field(description="The total number of employees")
+    total_engineers: Optional[int] = Field(description="The total number of engineers")
+    nyc_employees: Optional[int] = Field(description="The number of employees in NYC")
+    urls: Optional[List[str]] = Field(description="Additional URLs for the company")
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def handle_unknown(cls, v):
+        if v == "<UNKNOWN>":
+            return None
+        return v
+
+
 class Researcher:
 
     def __init__(self, url, model):
         self.url = url
         self.data = {'url': url}
-        self.model = ChatOpenAI(
+        if model.startswith("gpt-"):
+            chatclass = ChatOpenAI
+            kwargs = {"response_format": {"type": "json_object"}}
+            structured_output = False
+            self.use_parser = True
+        elif model.startswith("claude-"):
+            chatclass = ChatAnthropic
+            kwargs = {}
+            structured_output = True
+            self.use_parser = False
+        else:
+            raise ValueError(f"Unsupported model: {model}")
+
+        self.model = chatclass(
             model=model,
-            model_kwargs={"response_format": {"type": "json_object"}},
+            model_kwargs=kwargs,
         )
+        if structured_output:
+            self.model = self.model.with_structured_output(CompanyInfo)
+
         self.collection_name = self.get_collection_name(url)
         self.vectorstore = self.make_vector_db()
 
@@ -73,7 +120,7 @@ class Researcher:
         url = re.sub(r"\W+", "-", url)
         url = url.strip("-_")
         url = url[:63]
-        logging.debug(f"Collection name: {url}")
+        logger.debug(f"Collection name: {url}")
         return url
 
     def get_text_splits_from_url(self):
@@ -111,23 +158,33 @@ class Researcher:
         retriever = self.vectorstore.as_retriever()
         rag_prompt = hub.pull("rlm/rag-prompt")
 
-        # Consider using https://python.langchain.com/docs/concepts/#structured-output-tool-calling
         rag_chain = (
             {"context": retriever | self.format_docs, "question": RunnablePassthrough()}
             | rag_prompt
             | self.model
-            | self.parser
         )
+        if self.use_parser:
+            rag_chain = rag_chain | self.parser
 
         result = rag_chain.invoke(prompt_template.format(**data))
-        return result
+
+        # The result should already be a CompanyInfo object
+        if isinstance(result, CompanyInfo):
+            return result.model_dump()
+        elif isinstance(result, dict):
+            return result
+        else:
+            raise ValueError(
+                f"Unexpected result type: {type(result)}. Expected CompanyInfo or dict."
+            )
 
     def find_company_name(self):
         result = self.invoke_and_get_dict(
             "What is the name of the company at this URL? "
             'You must always output a valid JSON object with a "company" key. '
+            " If unknown, set it to null."
             "{url}"
-            )
+        )
         self.data.update(result)
 
     def find_funding_status(self):
@@ -136,8 +193,9 @@ class Researcher:
             'You must always output a valid JSON object with a "funding_status" key. '
             'The value must be one of "public", "private", "unicorn", "private finance". '
             '"unicorn" means a private company valued at over $1 billion US. '
+            "If unknown, set it to null. "
             "{company} {url}"
-            )
+        )
         self.data.update(result)
 
     def find_more_urls(self):
@@ -154,20 +212,21 @@ class Researcher:
         result = self.invoke_and_get_dict(
             "What are the headcounts of {company} at {url}? "
             "Possible other URLs to check: {urls} "
-            'You must always output a valid JSON object with the following keys: '
+            "You must always output a valid JSON object with the following keys: "
             '"total_employees", "total_engineers", "nyc_employees". '
             "The values must be integers, or null if unknown. "
-            "{company} {url}"
-            )
-        self.data["headcounts"] = result
+            "{company} {url} {urls}"
+        )
+        self.data.update(result)
 
     def find_mission(self):
         result = self.invoke_and_get_dict(
             "What is the mission of {company} at {url}? "
             "Possible other URLs to check: {urls} "
             'You must always output a valid JSON object with a "mission" key. '
+            "Set it to null if unknown. "
             "{company} {url} {urls}"
-            )
+        )
         self.data.update(result)
 
     def find_work_policy(self):
@@ -199,9 +258,25 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the company to research")
-    parser.add_argument("--model", help="OpenAI model to use", action="store", default="gpt-4o",
-                        choices=["gpt-4o", "gpt-4o-turbo", "gpt-4-turbo", "gpt-3.5-turbo"])
+    parser.add_argument(
+        "--model",
+        help="AI model to use",
+        action="store",
+        default="gpt-4o",
+        choices=[
+            "gpt-4o",
+            "gpt-4o-turbo",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "claude-3-5-sonnet-latest",
+            "claude-3-haiku-latest",
+        ],
+    )
+    parser.add_argument("--verbose", action="store_true")
+
     args = parser.parse_args()
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
     data = main(args.url, model=args.model)
     import pprint
     pprint.pprint(data)
