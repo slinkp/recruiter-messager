@@ -11,21 +11,28 @@ recruiters, and then send them from my gmail account.
 Is this a good time investment? Since it's an excuse to learn RAG
 techniques on a practical problem I actually have, absolutely!
 
-# Roadmap
+# Roadmap - reply client
 
 - [x] Retrieve recruiter messages (and my replies) from gmail
 - [x] Build a RAG chain trained on those messages
-  - [ ] Understand the parts of the chain that I don't yet!
-  - [ ] What is RunnablePassThrough? 
+  - [x] Understand the parts of the chain that I don't yet!
+  - [x] What is RunnablePassThrough?
   - [ ] Look at traces (where? langsmith?) and see if I can understand the chain
 - [x] Try both claude and chatgpt, allow choosing 
 - [x] Demo of generating replies based on example new messages
-- [ ] Retrieve new recruiter messages that I have *not* replied to
+- [ ] Client: Retrieve new recruiter messages that I have *not* replied to
   - [ ] Solve problem of linkedin email that are recruiter followup, but gmail doesn't thread them
-  - [ ] Solve messages that I've already replied to on linkedin and so aren't in gmail
+  - [ ] Solve messages that I've already replied to on linkedin and so aren't
+        in gmail - maybe require manually re-labeling?
 - [ ] Iterate on prompt against real recruiter email, until test replies to
       those usually look good
 - [ ] Build a little UX allowing me to approve / edit / send replies
+  - [ ] Decide on framework for this. Probably in browser
+  - [ ] Streamlit?
+  - [ ] Features:
+    - [ ] Send as is
+    - [ ] Edit and send
+    - [ ] Skip
 - [ ] Send replies
 - [ ] Re-label replied messages, so it's easier to track what's done
 - [ ] Work through the existing backlog with this tool
