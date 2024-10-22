@@ -145,10 +145,19 @@ Paul
   - [ ] levels.fyi - use some browser driver for this?
     - [ ] comparative level
     - [ ] salary - iterative search
+      - [ ] baes
+      - [ ] RSU
+      - [ ] bonuses
+      - [ ] vesting schedule
   - [ ] General info
-    - [ ] size, funding, public status, remote policy, etc
-    - [ ] chatgpt seems to be quite good at this, given company URL
-    - [ ] tell it to format result as json, it's also good at this
+    - [ ] size (eng, total, NYC)
+    - [ ] funding / public status
+    - [ ] remote policy (remote / hybrid / onsite)
+    - [ ] headquarters location
+    - [ ] chatgpt seems to be quite good at this, given company URL - but
+          unreliable via API, use RAG as per website-questioner demo.
+          This would also allow using original email as context!
+    - [x] tell it to format result as json, it's also good at this
 - [ ] Dump this all into google sheet
 
 
