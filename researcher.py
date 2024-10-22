@@ -152,11 +152,24 @@ class Researcher:
     def format_docs(self, docs):
         return "\n\n".join(doc.page_content for doc in docs)
 
+    def rag_prompt(self):
+        text = """\
+        You are an assistant for question-answering tasks,
+        researching information about companies that are potential employers
+        for the asker.
+        Use the following pieces of retrieved context to answer the question.
+        The question will include directions about formatting the output
+        and how to respond if you don't know the answer.
+        Question: {question} 
+        Context: {context} 
+        Answer:"""
+        return ChatPromptTemplate([text], input_variables=["context", "question"])
+
     def invoke_and_get_dict(self, prompt: str, data: dict|None = None) -> dict:
         data = data or self.data
         prompt_template = ChatPromptTemplate.from_template(prompt)
         retriever = self.vectorstore.as_retriever()
-        rag_prompt = hub.pull("rlm/rag-prompt")
+        rag_prompt = self.rag_prompt()
 
         rag_chain = (
             {"context": retriever | self.format_docs, "question": RunnablePassthrough()}
