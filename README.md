@@ -138,3 +138,52 @@ with your offering. I look forward to hearing more.  Best regards,
 Paul
 ```
 
+# Roadmap - research agent
+
+- [ ] formalize my research steps
+  - [ ] role specifics from email, if any
+  - [ ] levels.fyi - use some browser driver for this?
+    - [ ] comparative level
+    - [ ] salary - iterative search
+  - [ ] General info
+    - [ ] size, funding, public status, remote policy, etc
+    - [ ] chatgpt seems to be quite good at this, given company URL
+    - [ ] tell it to format result as json, it's also good at this
+- [ ] Dump this all into google sheet
+
+
+Instant proof of concept from chatgpt interactive:
+
+Prompts I tried:
+```
+What is the funding status of this company? https://www.rokt.com/ 
+
+(response skipped)
+
+how many employees does rokt have, and as of what date?
+
+(response skipped)
+
+What is their remote work policy? Please give the result along with the previous info in the form of this JSON response, where the items in brackets are placeholders
+
+{"name":  <company name>,  "public":  <boolean>, "headquarters": <city>, "size estimate": <int>,  "work policy":  <hybrid|remote|full onsite> } 
+```
+
+Response to the last prompt:
+
+```
+Here is the requested JSON response for Rokt:
+```
+```json
+{
+  "name": "Rokt",
+  "public": false,
+  "headquarters": "New York City",
+  "size estimate": 600,
+  "work policy": "hybrid"
+}
+```
+
+```
+Rokt is a private company headquartered in New York City with approximately 600 employees. Their work policy is hybrid, requiring employees to work onsite for at least three days a week​
+```
