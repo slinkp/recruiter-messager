@@ -34,10 +34,23 @@ Info to find:
 Based on https://python.langchain.com/docs/concepts/#json-mode
 """
 
+import os
+import re
+import logging
+from langchain import hub
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langchain.output_parsers.json import SimpleJsonOutputParser
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(HERE, "data")
+
+logger = logging.getLogger(__name__)
 
 class Researcher:
 
@@ -46,20 +59,68 @@ class Researcher:
         self.data = {'url': url}
         self.model = ChatOpenAI(
             model=model,
-            model_kwargs={ "response_format": { "type": "json_object" } },
-            )
-
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
+        self.collection_name = self.get_collection_name(url)
+        self.vectorstore = self.make_vector_db()
 
     @property
     def parser(self):
         return SimpleJsonOutputParser()
 
+    def get_collection_name(self, url: str):
+        url = re.sub(r"https?://", "", url)
+        url = re.sub(r"\W+", "-", url)
+        url = url.strip("-_")
+        url = url[:63]
+        logging.debug(f"Collection name: {url}")
+        return url
+
+    def get_text_splits_from_url(self):
+        logger.debug(f"Fetching and splitting contents of {self.url}")
+        loader = WebBaseLoader(web_paths=(self.url,))
+        docs = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, chunk_overlap=200
+        )
+        splits = text_splitter.split_documents(docs)
+        return splits
+
+    def make_vector_db(self):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        vectorstore = Chroma(
+            collection_name=self.collection_name,
+            embedding_function=embeddings,
+            persist_directory=DATA_DIR,
+        )
+        has_data = bool(vectorstore.get(limit=1, include=[])["ids"])
+        if not has_data:
+            logging.info(
+                f"Adding initial documents to the vector store {self.collection_name}"
+            )
+            splits = self.get_text_splits_from_url()
+            vectorstore.add_documents(splits)
+        return vectorstore
+
+    def format_docs(self, docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
     def invoke_and_get_dict(self, prompt: str, data: dict|None = None) -> dict:
         data = data or self.data
-        prompt = ChatPromptTemplate.from_template(prompt)
-        chain = prompt | self.model | self.parser
+        prompt_template = ChatPromptTemplate.from_template(prompt)
+        retriever = self.vectorstore.as_retriever()
+        rag_prompt = hub.pull("rlm/rag-prompt")
+
         # Consider using https://python.langchain.com/docs/concepts/#structured-output-tool-calling
-        return chain.invoke(data)
+        rag_chain = (
+            {"context": retriever | self.format_docs, "question": RunnablePassthrough()}
+            | rag_prompt
+            | self.model
+            | self.parser
+        )
+
+        result = rag_chain.invoke(prompt_template.format(**data))
+        return result
 
     def find_company_name(self):
         result = self.invoke_and_get_dict(
@@ -150,4 +211,3 @@ if __name__ == '__main__':
 # - gpt-4o:  status = unicorn, urls = careers, team, workplace, compensation, blog
 # - gpt-4-turbo: status = private, urls = careers, about, blog
 # Sometimes complain about being unable to open URLs.
-
