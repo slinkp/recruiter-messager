@@ -133,6 +133,13 @@ class Researcher:
         if has_data and not refresh:
             logger.info(f"Loaded existingvector store for {self.collection_name}")
             return
+
+        self.vectorstore.delete_collection()
+        self.vectorstore = Chroma(
+            collection_name=self.collection_name,
+            embedding_function=embeddings,
+            persist_directory=DATA_DIR,
+        )
         logger.info(
             f" Fetching and splitting documents from {self.url} to the vector store {self.collection_name}"
         )
