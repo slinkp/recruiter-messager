@@ -249,29 +249,11 @@ class Researcher:
             'You must always output a valid JSON object with a "funding_status" key. '
             'The value must be one of "public", "private", "unicorn", "private finance". '
             '"unicorn" means a private company valued at over $1 billion US. '
+            '"private finance" means a private company that works primarily on fintech or other financial services. '
             "If unknown, set it to null. "
             "{company} {url}"
         )
         self.data.update(result)
-
-    def find_more_urls(self) -> list[str]:
-        # TODO: the plain text version of the html does not include actual URLs.
-        # We may want to do something like https://www.youtube.com/watch?v=X87SabAlbFQ instead
-        result = self.invoke_and_get_dict(
-            "What are some other URLs for the company at {url}? "
-            "Look for all pages that contain information about careers, team, workplace, compensation, blog. "
-            'You must always output a valid JSON object with a "urls" key. '
-            "The value must be a list of strings. "
-            "{url}"
-        )
-        self.data.update(result)
-        return result["urls"]
-
-    def update_vector_db_from_urls(self, urls: list[str]):
-        logger.debug(f"  Getting text splits from more URLs: {urls}")
-        splits, ids = self.get_text_splits_from_urls(*urls)
-        logger.debug(f"  Updating vector database with {len(splits)} new splits")
-        self.populate_vector_db(splits, ids)
 
     def find_headcounts(self):
         result = self.invoke_and_get_dict(
