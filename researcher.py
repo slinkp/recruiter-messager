@@ -37,7 +37,6 @@ Based on https://python.langchain.com/docs/concepts/#json-mode
 import os
 import re
 import logging
-from langchain import hub
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.output_parsers import StrOutputParser
@@ -109,7 +108,9 @@ class Researcher:
             self.model = self.model.with_structured_output(CompanyInfo)
 
         self.collection_name = self.get_collection_name(url)
-        self.vectorstore = self.make_vector_db()
+        splits, ids = self.get_text_splits_from_urls(url)
+        self.vectorstore = None
+        self.populate_vector_db(splits, ids)
 
     @property
     def parser(self):
@@ -123,31 +124,33 @@ class Researcher:
         logger.debug(f"Collection name: {url}")
         return url
 
-    def get_text_splits_from_url(self):
-        logger.debug(f"Fetching and splitting contents of {self.url}")
-        loader = WebBaseLoader(web_paths=(self.url,))
+    def get_text_splits_from_urls(self, *urls: list[str]):
+        logger.debug(f"Fetching and splitting contents of {urls}")
+        loader = WebBaseLoader(web_paths=urls)
         docs = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200
         )
         splits = text_splitter.split_documents(docs)
-        return splits
+        base_id = hash(tuple(urls))
+        ids = []
+        for i, split in enumerate(splits):
+            _id = str(hash((base_id, i)))
+            split.metadata["id"] = _id
+            ids.append(_id)
+        return splits, ids
 
-    def make_vector_db(self):
+    def populate_vector_db(self, splits, ids):
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-        vectorstore = Chroma(
+        self.vectorstore = self.vectorstore or Chroma(
             collection_name=self.collection_name,
             embedding_function=embeddings,
             persist_directory=DATA_DIR,
         )
-        has_data = bool(vectorstore.get(limit=1, include=[])["ids"])
-        if not has_data:
-            logging.info(
-                f"Adding initial documents to the vector store {self.collection_name}"
-            )
-            splits = self.get_text_splits_from_url()
-            vectorstore.add_documents(splits)
-        return vectorstore
+        logging.info(
+            f"Adding or updating documents to the vector store {self.collection_name}"
+        )
+        self.vectorstore.add_documents(documents=splits, ids=ids)
 
     def format_docs(self, docs):
         return "\n\n".join(doc.page_content for doc in docs)
@@ -211,15 +214,22 @@ class Researcher:
         )
         self.data.update(result)
 
-    def find_more_urls(self):
+    def find_more_urls(self) -> list[str]:
         result = self.invoke_and_get_dict(
-            "What are some other URLs for {company} at {url}? "
+            "What are some other URLs for the company at {url}? "
             "Look for all pages that contain information about careers, team, workplace, compensation, blog. "
             'You must always output a valid JSON object with a "urls" key. '
-            'The value must be a list of strings. '
-            "{company} {url}"
-            )
+            "The value must be a list of strings. "
+            "{url}"
+        )
         self.data.update(result)
+        return result["urls"]
+
+    def update_vector_db_from_urls(self, urls: list[str]):
+        logger.debug(f"  Getting text splits from more URLs: {urls}")
+        splits, ids = self.get_text_splits_from_urls(*urls)
+        logger.debug(f"  Updating vector database with {len(splits)} new splits")
+        self.populate_vector_db(splits, ids)
 
     def find_headcounts(self):
         result = self.invoke_and_get_dict(
@@ -253,10 +263,12 @@ class Researcher:
         self.data.update(result)
 
     def main(self) -> dict:
+        urls = self.find_more_urls()
+        # TODO only update vector db if there are new URLs
+        self.update_vector_db_from_urls(urls)
         self.find_company_name()
-        self.find_more_urls()
         self.find_funding_status()
-        # self.find_headcounts()
+        self.find_headcounts()
         self.find_mission()
         self.find_work_policy()
         return self.data
