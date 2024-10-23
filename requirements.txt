@@ -14,3 +14,4 @@ langchain-chroma
 
 pylsp-mypy
 beautifulsoup4
+lxml

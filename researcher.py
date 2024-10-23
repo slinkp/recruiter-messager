@@ -38,7 +38,7 @@ import os
 import re
 import logging
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import WebBaseLoader, RecursiveUrlLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_anthropic import ChatAnthropic
@@ -48,11 +48,22 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, field_validator
+from bs4 import BeautifulSoup
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
 
 logger = logging.getLogger(__name__)
+
+
+blankline_re = re.compile(r"\n\s*\n+")
+
+
+def bs4_extractor(html: str) -> str:
+    soup = BeautifulSoup(html, "lxml")
+    text = blankline_re.sub(r"\n\n", soup.text).strip()
+    return text
 
 
 class CompanyInfo(BaseModel):
@@ -72,21 +83,23 @@ class CompanyInfo(BaseModel):
     total_employees: Optional[int] = Field(description="The total number of employees")
     total_engineers: Optional[int] = Field(description="The total number of engineers")
     nyc_employees: Optional[int] = Field(description="The number of employees in NYC")
-    urls: Optional[List[str]] = Field(description="Additional URLs for the company")
 
     @field_validator("*", mode="before")
     @classmethod
     def handle_unknown(cls, v):
-        if v == "<UNKNOWN>":
+        # Some models return "UNKNOWN" or "<UNKNOWN>" for unknown values, disregarding
+        # our instructions to use null.
+        if isinstance(v, str) and "UNKNOWN" in v:
             return None
         return v
 
 
 class Researcher:
 
-    def __init__(self, url, model):
+    def __init__(self, url, model, refresh_rag_db: bool = False):
         self.url = url
-        self.data = {'url': url}
+        self.urls = [url]
+        self.data = {"url": url, "urls": self.urls}
         if model.startswith("gpt-"):
             chatclass = ChatOpenAI
             kwargs = {"response_format": {"type": "json_object"}}
@@ -108,9 +121,28 @@ class Researcher:
             self.model = self.model.with_structured_output(CompanyInfo)
 
         self.collection_name = self.get_collection_name(url)
-        splits, ids = self.get_text_splits_from_urls(url)
-        self.vectorstore = None
+        self.setup_rag_db(refresh=refresh_rag_db)
+
+    def setup_rag_db(self, refresh: bool = False):
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        self.vectorstore = Chroma(
+            collection_name=self.collection_name,
+            embedding_function=embeddings,
+            persist_directory=DATA_DIR,
+        )
+        has_data = bool(self.vectorstore.get(limit=1, include=[])["ids"])
+        if has_data and not refresh:
+            logger.info(f"Loaded existingvector store for {self.collection_name}")
+            return
+        logger.info(
+            f" Fetching and splitting documents from {self.url} to the vector store {self.collection_name}"
+        )
+        splits, ids = self.get_text_splits_from_url(self.url)
+        logger.info(
+            f" Adding {len(splits)} splits to the vector store {self.collection_name}"
+        )
         self.populate_vector_db(splits, ids)
+        logger.info(f"Done setting up vector store {self.collection_name}")
 
     @property
     def parser(self):
@@ -124,15 +156,29 @@ class Researcher:
         logger.debug(f"Collection name: {url}")
         return url
 
-    def get_text_splits_from_urls(self, *urls: list[str]):
-        logger.debug(f"Fetching and splitting contents of {urls}")
-        loader = WebBaseLoader(web_paths=urls)
-        docs = loader.load()
+    def get_text_splits_from_url(self, url: str):
+        logger.debug(f"Fetching and splitting contents of {url}")
+        loader = RecursiveUrlLoader(url=url, max_depth=2, extractor=bs4_extractor)
+
+        docs_limit = 100
+
+        docs = []
+        for doc in loader.lazy_load():
+            url = doc.metadata["source"].rstrip("/#")
+            if url in self.urls:
+                logger.error(f" Already seen {url}, skipping")
+                continue
+            self.urls.append(url)
+            logger.info(f" Got {url}: {doc.page_content[:100]}")
+            docs.append(doc)
+            if len(docs) >= docs_limit:
+                break
+
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200
         )
         splits = text_splitter.split_documents(docs)
-        base_id = hash(tuple(urls))
+        base_id = hash(url)
         ids = []
         for i, split in enumerate(splits):
             _id = str(hash((base_id, i)))
@@ -141,12 +187,6 @@ class Researcher:
         return splits, ids
 
     def populate_vector_db(self, splits, ids):
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-        self.vectorstore = self.vectorstore or Chroma(
-            collection_name=self.collection_name,
-            embedding_function=embeddings,
-            persist_directory=DATA_DIR,
-        )
         logging.info(
             f"Adding or updating documents to the vector store {self.collection_name}"
         )
@@ -215,6 +255,8 @@ class Researcher:
         self.data.update(result)
 
     def find_more_urls(self) -> list[str]:
+        # TODO: the plain text version of the html does not include actual URLs.
+        # We may want to do something like https://www.youtube.com/watch?v=X87SabAlbFQ instead
         result = self.invoke_and_get_dict(
             "What are some other URLs for the company at {url}? "
             "Look for all pages that contain information about careers, team, workplace, compensation, blog. "
@@ -234,38 +276,34 @@ class Researcher:
     def find_headcounts(self):
         result = self.invoke_and_get_dict(
             "What are the headcounts of {company} at {url}? "
-            "Possible other URLs to check: {urls} "
+            "Look for information about the number of employees, "
+            "the number of engineers, and the number of employees in NYC. "
             "You must always output a valid JSON object with the following keys: "
             '"total_employees", "total_engineers", "nyc_employees". '
             "The values must be integers, or null if unknown. "
-            "{company} {url} {urls}"
+            "{company} {url}"
         )
         self.data.update(result)
 
     def find_mission(self):
         result = self.invoke_and_get_dict(
             "What is the mission of {company} at {url}? "
-            "Possible other URLs to check: {urls} "
             'You must always output a valid JSON object with a "mission" key. '
             "Set it to null if unknown. "
-            "{company} {url} {urls}"
+            "{company} {url}"
         )
         self.data.update(result)
 
     def find_work_policy(self):
         result = self.invoke_and_get_dict(
             "What is the remote work policy of {company} at {url}? "
-            "Possible other URLs to check: {urls} "
             'You must always output a valid JSON object with the key "work_policy". '
             'The value must be one of "remote", "hybrid", "onsite", or null if cannot be determined. '
-            "{company} {url} {urls}"
-            )
+            "{company} {url}"
+        )
         self.data.update(result)
 
     def main(self) -> dict:
-        urls = self.find_more_urls()
-        # TODO only update vector db if there are new URLs
-        self.update_vector_db_from_urls(urls)
         self.find_company_name()
         self.find_funding_status()
         self.find_headcounts()
@@ -274,13 +312,18 @@ class Researcher:
         return self.data
 
 
-def main(url, model):
-    researcher = Researcher(url, model)
+def main(url, model, refresh_rag_db: bool = False):
+    researcher = Researcher(url, model, refresh_rag_db=refresh_rag_db)
     return researcher.main()
 
 
 if __name__ == '__main__':
     import argparse
+    import sys
+
+    if len(sys.argv) < 2:
+        sys.argv.append("https://rokt.com")  # HACK for testing
+
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the company to research")
     parser.add_argument(
@@ -290,19 +333,23 @@ if __name__ == '__main__':
         default="gpt-4o",
         choices=[
             "gpt-4o",
-            "gpt-4o-turbo",
             "gpt-4-turbo",
             "gpt-3.5-turbo",
             "claude-3-5-sonnet-latest",
-            "claude-3-haiku-latest",
         ],
     )
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument(
+        "--refresh-rag-db",
+        action="store_true",
+        default=False,
+        help="Force fetching data and refreshing the RAG database for this URL. Default is to use existing data.",
+    )
 
     args = parser.parse_args()
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    data = main(args.url, model=args.model)
+        logging.basicConfig(level=logging.INFO)
+    data = main(args.url, model=args.model, refresh_rag_db=args.refresh_rag_db)
     import pprint
     pprint.pprint(data)
 
