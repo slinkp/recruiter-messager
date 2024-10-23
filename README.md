@@ -140,24 +140,29 @@ Paul
 
 # Roadmap - research agent
 
-- [ ] formalize my research steps
+- [x] Proof of concept RAG agent
+  - [x] Try with both anthropic and openai
+  - [x] Try RecursiveUrlLoader to fetch more data from company websites
+  - [ ] Try with Tavily search
+- [x] formalize my research steps
+  - [x] General info
+    - [x] company name
+    - [ ] mission statement ... unreliable results so far
+    - [ ] headcount size (total, eng, NYC) ... no reliable results so far
+    - [x] funding / public status
+    - [x] remote policy (remote / hybrid / onsite)
+    - [ ] headquarters location
+    - [x] chatgpt seems to be quite good at this, given company URL - but
+          unreliable via API, use RAG as per website-questioner demo.
+    - [x] tell it to format result as json, it's also good at this
   - [ ] role specifics from email, if any
   - [ ] levels.fyi - use some browser driver for this?
     - [ ] comparative level
     - [ ] salary - iterative search
-      - [ ] baes
+      - [ ] base
       - [ ] RSU
       - [ ] bonuses
       - [ ] vesting schedule
-  - [ ] General info
-    - [ ] size (eng, total, NYC)
-    - [ ] funding / public status
-    - [ ] remote policy (remote / hybrid / onsite)
-    - [ ] headquarters location
-    - [ ] chatgpt seems to be quite good at this, given company URL - but
-          unreliable via API, use RAG as per website-questioner demo.
-          This would also allow using original email as context!
-    - [x] tell it to format result as json, it's also good at this
 - [ ] Dump this all into google sheet
 
 
