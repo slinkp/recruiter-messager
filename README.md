@@ -1,4 +1,4 @@
-# What: Automatic my recruiter email replies via gmail and RAG
+# Problem 1: Automatic my recruiter email replies via gmail and RAG
 
 Most of the recruiter mail I get is for positions that aren't a good match.
 It's hard to find the good ones, and I don't want to spend a lot of time on it
@@ -138,12 +138,22 @@ with your offering. I look forward to hearing more.  Best regards,
 Paul
 ```
 
-# Roadmap - research agent
+# Problem 2: Research agent
+
+Researching companies is time consuming and tedious.
+Data entry into my spreadsheet is tedious.
+Can RAG or other AI techniques help automate this?
+
+## Research agent roadmap
 
 - [x] Proof of concept RAG agent
   - [x] Try with both anthropic and openai
   - [x] Try RecursiveUrlLoader to fetch more data from company websites
+        ... this is not helping much; we're downloading entire websites and not
+        finding the information we want. Hard to verify if it's even present.
+      - [ ] Try again with a "known good" website, ie one where I know what info to expect?
   - [ ] Try with Tavily search
+      - [ ] Lots of decisions to make here per https://blog.langchain.dev/weblangchain/
 - [x] formalize my research steps
   - [x] General info
     - [x] company name
@@ -156,7 +166,8 @@ Paul
           unreliable via API, use RAG as per website-questioner demo.
     - [x] tell it to format result as json, it's also good at this
   - [ ] role specifics from email, if any
-  - [ ] levels.fyi - use some browser driver for this?
+    - [ ] include link from email if any in web searches
+  - [ ] levels.fyi - use some browser driver for this? i need to be logged in
     - [ ] comparative level
     - [ ] salary - iterative search
       - [ ] base
