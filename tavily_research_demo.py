@@ -43,7 +43,6 @@ Return these results as a valid JSON object, with the following keys:
     - headcount_engineers
     - citation_urls
 
-Value of citation_urls should be a list of strings.
 Values of other keys should be integers, if known. If value is not known, it should be null.
 """
 
@@ -67,7 +66,9 @@ The remote work policy should be one of the following:
     - "in-person"
     - null
 
-The value of nyc_office_address should be a valid US mailing address, if known.
+The value of nyc_office_address, if known, must be returned as a valid US mailing address with a street address, 
+city, state, and zip code.
+The value of headquarters_city must be the city, state/province, and country of the company's headquarters, if known.
 """
 
 MISSION_PROMPT = """
@@ -78,7 +79,6 @@ You must always output a valid JSON object with keys:
   - "industry"
   - "citation_urls"
 
-citation_urls should be a list of strings of URLs that contain the information above.
 Set other values to null if unknown.
 """
 
@@ -93,7 +93,6 @@ You must output JSON with these keys:
     - unicorn_status
     - citation_urls
 
-citation_urls should be a list of strings of URLs that contain the information above.
 funding_status must be one of "public" or "private", or null if unkown.
 funding_series should be a string such as "Series A", "Series B", etc. if known and the company is private, otherwise null.
 "valuation" should be an integer in millions of dollars if known.
@@ -112,6 +111,7 @@ def make_prompt(prompt: str, **kwargs):
             prompt,
             "",
             "You must always output a valid JSON object with exactly the keys specified in the prompt.",
+            "citation_urls should always be a list of strings of URLs that contain the information above.",
             "If any string json value other than a citation url is longer than 80 characters, write a shorter summary of the value.",
             "Return ONLY the JSON object, nothing else.",
         ]
