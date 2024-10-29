@@ -10,21 +10,23 @@ from langchain_core.globals import set_llm_cache
 # I set up API key via direnv
 
 
-def main(query: str, verbose: bool = False):
-    # set up the agent
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.7)
-    search = TavilySearchAPIWrapper()
-    tavily_tool = TavilySearchResults(api_wrapper=search)
+class ResearchAgent:
+    def __init__(self, verbose: bool = False):
 
-    # Cache to reduce LLM calls.
-    set_llm_cache(SQLiteCache(database_path=".langchain-cache.db"))
-    agent_chain = create_conversational_retrieval_agent(
-        llm, [tavily_tool], verbose=verbose
-    )
+        # set up the agent
+        self.llm = ChatOpenAI(model_name="gpt-4", temperature=0.7)
+        self.search_wrapper = TavilySearchAPIWrapper()
+        self.tavily_tool = TavilySearchResults(api_wrapper=self.search_wrapper)
 
-    result = agent_chain.invoke(args.query)
+        # Cache to reduce LLM calls.
+        set_llm_cache(SQLiteCache(database_path=".langchain-cache.db"))
+        self.agent_chain = create_conversational_retrieval_agent(
+            self.llm, [self.tavily_tool], verbose=verbose
+        )
 
-    return result["output"]
+    def single_search(self, query: str):
+        result = self.agent_chain.invoke(query)
+        return result["output"]
 
 
 if __name__ == "__main__":
@@ -35,4 +37,5 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    print(main(args.query, args.verbose))
+    agent = ResearchAgent(verbose=args.verbose)
+    print(agent.single_search(args.query))
