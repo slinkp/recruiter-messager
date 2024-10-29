@@ -45,7 +45,6 @@ Return these results as a valid JSON object, with the following keys:
 
 Value of citation_urls should be a list of strings.
 Values of other keys should be integers, if known. If value is not known, it should be null.
-Return ONLY the JSON object, nothing else.
 """
 
 OFFICE_PROMPT = """
@@ -68,7 +67,7 @@ The remote work policy should be one of the following:
     - "in-person"
     - null
 
-Return ONLY the JSON object, nothing else.
+The value of nyc_office_address should be a valid US mailing address, if known.
 """
 
 MISSION_PROMPT = """
