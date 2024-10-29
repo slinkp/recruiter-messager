@@ -1,4 +1,6 @@
 import os
+import json
+
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 from langchain.agents.agent_toolkits import create_conversational_retrieval_agent
 from langchain_openai import ChatOpenAI
@@ -116,7 +118,7 @@ def make_prompt(prompt: str, **kwargs):
     )
 
 
-PROMPTS = [
+COMPANY_PROMPTS = [
     MISSION_PROMPT,
     FUNDING_PROMPT,
     OFFICE_PROMPT,
@@ -137,8 +139,17 @@ if __name__ == "__main__":
     if args.query:
         print(agent.single_search(args.query))
     elif args.company:
-        for prompt in PROMPTS:
+        data = {
+            "citation_urls": set(),
+        }
+        for prompt in COMPANY_PROMPTS:
             prompt = make_prompt(prompt, company_name=args.company)
-            print(agent.single_search(prompt))
+            result = agent.single_search(prompt)
+            chunk = json.loads(result)
+            citation_urls = chunk.pop("citation_urls", set())
+            data["citation_urls"].update(citation_urls)
+            data.update(chunk)
+        data["citation_urls"] = sorted(data["citation_urls"])
+        print(json.dumps(data, indent=2))
     else:
         print("No query or company provided")
