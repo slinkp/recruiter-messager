@@ -22,6 +22,8 @@ class ResearchAgent:
 
         # Cache to reduce LLM calls.
         set_llm_cache(SQLiteCache(database_path=".langchain-cache.db"))
+        # Note this chain can ONLY use ChatOpenAI, not ChatAnthropic.
+        # Is there a workaround?
         self.agent_chain = create_conversational_retrieval_agent(
             self.llm, [self.tavily_tool], verbose=verbose
         )
