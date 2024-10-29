@@ -113,6 +113,7 @@ def make_prompt(prompt: str, **kwargs):
             prompt,
             "",
             "You must always output a valid JSON object with exactly the keys specified in the prompt.",
+            "If any string json value other than a citation url is longer than 80 characters, write a shorter summary of the value.",
             "Return ONLY the JSON object, nothing else.",
         ]
     )
