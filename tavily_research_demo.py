@@ -49,11 +49,13 @@ Return ONLY the JSON object, nothing else.
 OFFICE_PROMPT = """
 For the company {company_name}, find:
     - the city of the company's headquarters
+    - address of the company's New York City metro area office, if there is one
     - the company's remote work policy
     - the URLs of the pages that contain the information above
 
 Return these results as a valid JSON object, with the following keys:
     - headquarters_city
+    - nyc_office_address
     - remote_work_policy
     - citation_urls
 
@@ -64,10 +66,59 @@ The remote work policy should be one of the following:
     - "in-person"
     - null
 
-Return ONLYthe JSON object, nothing else.
+Return ONLY the JSON object, nothing else.
 """
 
+MISSION_PROMPT = """
+What is the homepage, industry and mission of {company_name}?
+You must always output a valid JSON object with keys:
+  - "homepage"
+  - "mission"
+  - "industry"
+  - "citation_urls"
+
+citation_urls should be a list of strings of URLs that contain the information above.
+Set other values to null if unknown.
+"""
+
+FUNDING_PROMPT = """
+What is the funding status of {company_name}?
+You must output JSON with these keys:
+    - funding_status
+    - funding_series
+    - valuation
+    - valuation_date
+    - stock_symbol
+    - unicorn_status
+    - citation_urls
+
+citation_urls should be a list of strings of URLs that contain the information above.
+funding_status must be one of "public" or "private", or null if unkown.
+funding_series should be a string such as "Series A", "Series B", etc. if known and the company is private, otherwise null.
+"valuation" should be an integer in millions of dollars if known.
+"valuation_date" should be a string in YYYY-MM-DD format if known, otherwise null.
+"stock_symbol" should be a string if known, otherwise null.
+"unicorn_status" should be a boolean that's true, if the company is worth over $1 billion USD, false if less, null if unknown.
+"""
+
+
+def make_prompt(prompt: str, **kwargs):
+    prompt = prompt.format(**kwargs)
+    return "\n".join(
+        [
+            "You are a helpful research agent researching companies.",
+            "You may use any context you have gathered in previous queries to answer the current question.",
+            prompt,
+            "",
+            "You must always output a valid JSON object with exactly the keys specified in the prompt.",
+            "Return ONLY the JSON object, nothing else.",
+        ]
+    )
+
+
 PROMPTS = [
+    MISSION_PROMPT,
+    FUNDING_PROMPT,
     OFFICE_PROMPT,
     HEADCOUNT_PROMPT,
 ]
@@ -87,7 +138,7 @@ if __name__ == "__main__":
         print(agent.single_search(args.query))
     elif args.company:
         for prompt in PROMPTS:
-            prompt = prompt.format(company_name=args.company)
+            prompt = make_prompt(prompt, company_name=args.company)
             print(agent.single_search(prompt))
     else:
         print("No query or company provided")

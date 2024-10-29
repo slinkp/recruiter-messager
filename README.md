@@ -152,16 +152,16 @@ Can RAG or other AI techniques help automate this?
         ... this is not helping much; we're downloading entire websites and not
         finding the information we want. Hard to verify if it's even present.
       - [ ] Try again with a "known good" website, ie one where I know what info to expect?
-  - [ ] Try with Tavily search
-      - [ ] Lots of decisions to make here per https://blog.langchain.dev/weblangchain/
+  - [x] Try with Tavily search
+      - [x] Lots of decisions to make here per https://blog.langchain.dev/weblangchain/
 - [x] formalize my research steps
   - [x] General info
     - [x] company name
     - [ ] mission statement ... unreliable results so far
-    - [ ] headcount size (total, eng, NYC) ... no reliable results so far
+    - [x] headcount size (total, eng, NYC) ... no reliable results so far
     - [x] funding / public status
     - [x] remote policy (remote / hybrid / onsite)
-    - [ ] headquarters location
+    - [x] headquarters location
     - [x] chatgpt seems to be quite good at this, given company URL - but
           unreliable via API, use RAG as per website-questioner demo.
     - [x] tell it to format result as json, it's also good at this
