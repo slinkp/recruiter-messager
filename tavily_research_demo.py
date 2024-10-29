@@ -6,14 +6,28 @@ from langchain_community.tools.tavily_search.tool import TavilySearchResults
 
 # I set up API key via direnv
 
-# set up the agent
-llm = ChatOpenAI(model_name="gpt-4", temperature=0.7)
-search = TavilySearchAPIWrapper()
-tavily_tool = TavilySearchResults(api_wrapper=search)
 
-agent_chain = create_conversational_retrieval_agent(llm, [tavily_tool], verbose=True)
+def main(query: str, verbose: bool = False):
+    # set up the agent
+    llm = ChatOpenAI(model_name="gpt-4", temperature=0.7)
+    search = TavilySearchAPIWrapper()
+    tavily_tool = TavilySearchResults(api_wrapper=search)
 
-# run the agent
-result = agent_chain.invoke("What happened in the latest burning man floods?")
+    agent_chain = create_conversational_retrieval_agent(
+        llm, [tavily_tool], verbose=verbose
+    )
 
-print(result["output"])
+    result = agent_chain.invoke(args.query)
+
+    return result["output"]
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("query", type=str)
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
+
+    print(main(args.query, args.verbose))
