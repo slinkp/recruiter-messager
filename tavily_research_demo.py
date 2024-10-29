@@ -79,7 +79,19 @@ You must always output a valid JSON object with keys:
   - "industry"
   - "citation_urls"
 
-Set other values to null if unknown.
+Set values to null if unknown.
+"""
+
+HIRING_PROMPT = """
+What is the hiring status of {company_name}?
+You must output JSON with these keys:
+    - hiring_status
+    - jobs_homepage_url
+    - citation_urls
+
+Hiring status should be a boolean that's true if the company is hiring, false if not, or null if unknown.
+jobs_homepage_url should be the URL of the company's primary jobs page, preferably on their own website, if known.
+Set values to null if unknown.
 """
 
 FUNDING_PROMPT = """
@@ -123,6 +135,7 @@ COMPANY_PROMPTS = [
     FUNDING_PROMPT,
     OFFICE_PROMPT,
     HEADCOUNT_PROMPT,
+    HIRING_PROMPT,
 ]
 
 

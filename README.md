@@ -157,8 +157,8 @@ Can RAG or other AI techniques help automate this?
 - [x] formalize my research steps
   - [x] General info
     - [x] company name
-    - [ ] mission statement ... unreliable results so far
-    - [x] headcount size (total, eng, NYC) ... no reliable results so far
+    - [x] mission statement
+    - [x] headcount size (total, eng, NYC)
     - [x] funding / public status
     - [x] remote policy (remote / hybrid / onsite)
     - [x] headquarters location
