@@ -4,6 +4,9 @@ from langchain.agents.agent_toolkits import create_conversational_retrieval_agen
 from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search.tool import TavilySearchResults
 
+from langchain_community.cache import SQLiteCache
+from langchain_core.globals import set_llm_cache
+
 # I set up API key via direnv
 
 
@@ -13,6 +16,8 @@ def main(query: str, verbose: bool = False):
     search = TavilySearchAPIWrapper()
     tavily_tool = TavilySearchResults(api_wrapper=search)
 
+    # Cache to reduce LLM calls.
+    set_llm_cache(SQLiteCache(database_path=".langchain-cache.db"))
     agent_chain = create_conversational_retrieval_agent(
         llm, [tavily_tool], verbose=verbose
     )

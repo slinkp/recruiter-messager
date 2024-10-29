@@ -2,3 +2,4 @@
 secrets/*json
 processed_messages.json
 data/*
+.langchain-cache.db
