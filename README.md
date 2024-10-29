@@ -174,6 +174,7 @@ Can RAG or other AI techniques help automate this?
       - [ ] RSU
       - [ ] bonuses
       - [ ] vesting schedule
+  - [ ] linkedin contact search - also in browser?
 - [ ] Dump this all into google sheet
 
 
