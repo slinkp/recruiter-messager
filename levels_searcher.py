@@ -228,7 +228,7 @@ class LevelsFyiSearcher:
             logger.info("Company option clicked")
             self.random_delay()  # Slightly longer delay for data to load
 
-            # Wait for either the Software Engineer link or the salary table
+            # Wait for either the Software Engineer link or the salary page
             logger.info("Checking if we're on the main company page or salary page...")
 
             try:
@@ -249,9 +249,21 @@ class LevelsFyiSearcher:
                 logger.error(f"Could not find Software Engineer link: {e}")
                 raise Exception("Could not find Software Engineer role on company page")
 
-            # Now we should be on the salary page
-            logger.info("Looking for salary data...")
-            salary_table = self.page.locator("table").first
+            # Click the "Added mine already" button to reveal full salary data
+            logger.info("Looking for 'Added mine already' button...")
+            already_added_button = self.page.get_by_role(
+                "button", name="Added mine already within last 1 year"
+            ).first
+
+            logger.info("Clicking 'Added mine already' button...")
+            already_added_button.click()
+            self.random_delay()  # Wait for table to update
+
+            # Now look for salary data in the specific table
+            logger.info("Looking for salary table...")
+            salary_table = self.page.locator(
+                "table[aria-label='Salary Submissions']"
+            ).first
             if not salary_table.is_visible(timeout=5000):
                 raise Exception("Could not find salary table on page")
 
