@@ -297,33 +297,54 @@ class LevelsFyiSearcher:
 
     def extract_salary_data(self) -> List[Dict]:
         logger.info("Extracting salary data...")
-        rows = self.page.locator("tr.salary-row_collapsedSalaryRow__IQ3om")
-        logger.info(f"Found {len(rows.all())} salary entries")
+
+        table = self.page.locator("table[aria-label='Salary Submissions']")
+        rows = table.locator("tbody tr")
+
+        logger.info(f"Found {len(rows.all())} total rows")
 
         results = []
         for i, row in enumerate(rows.all()):
             try:
+                # Quick check if this is a valid salary row - look for the level
+                level_element = row.locator("td:nth-child(2) p").first
+                if not level_element.is_visible(timeout=1000):
+                    logger.info(
+                        f"Skipping row {i+1} - appears to be an ad or invalid row"
+                    )
+                    continue
+
                 data = {
-                    "title": row.locator(".salary-row_levelName____tz6").inner_text(),
-                    "level": row.locator("td:nth-child(2) p").inner_text(),  # L5, etc
-                    "total_comp": row.locator(
-                        ".salary-row_totalCompCell__553Rk p"
-                    ).inner_text(),
-                    # Optional: Add more fields
                     "location": row.locator(
                         "td:nth-child(1) .MuiTypography-caption"
-                    ).inner_text(),
+                    ).inner_text(timeout=5000),
+                    "level": level_element.inner_text(timeout=5000),
+                    "role": row.locator(
+                        "td:nth-child(2) .MuiTypography-caption"
+                    ).inner_text(timeout=5000),
+                    "experience": row.locator("td:nth-child(3) p").inner_text(
+                        timeout=5000
+                    ),
+                    "total_comp": row.locator("td:nth-child(4) p").inner_text(
+                        timeout=5000
+                    ),
                     "breakdown": row.locator(
-                        ".salary-row_totalCompCell__553Rk .MuiTypography-caption"
-                    ).inner_text(),
+                        "td:nth-child(4) .MuiTypography-caption"
+                    ).inner_text(timeout=5000),
                 }
-                results.append(data)
-                logger.info(f"Parsed row {i+1}: {data}")
+
+                # Additional validation that we got all required fields
+                if all(data.values()):
+                    results.append(data)
+                    logger.info(f"Parsed row {i+1}: {data}")
+                else:
+                    logger.info(f"Skipping row {i+1} - missing required data")
+
             except Exception as e:
-                logger.error(f"Error parsing row {i+1}: {e}")
+                logger.info(f"Skipping row {i+1} - not a valid salary row: {str(e)}")
                 continue
 
-        logger.info(f"Successfully extracted {len(results)} salary entries")
+        logger.info(f"Successfully extracted {len(results)} valid salary entries")
         return results
 
     def cleanup(self) -> None:
@@ -374,7 +395,9 @@ def main():
 
         # Print results
         for result in results:
-            print(f"{result['title']} ({result['level']}): {result['total_comp']}")
+            print(
+                f"{result['level']} {result['role']} ({result['experience']}): {result['total_comp']} - {result['location']}"
+            )
         time.sleep(10)
 
     finally:
