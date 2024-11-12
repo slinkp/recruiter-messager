@@ -50,6 +50,59 @@ class LevelsFyiSearcher:
         )
         logger.info("Webdriver detection bypass added")
 
+    def main(self, company_name: str) -> List[Dict]:
+        """Main function to search for salary data at a company"""
+        # All of these work by side effects or raising exceptions
+        self.search_by_company_name(company_name)
+        self.random_delay()
+        self._navigate_to_salary_page()
+        self.random_delay()
+        return self.find_and_extract_salaries()
+
+    def test_shopify_salary(self) -> List[Dict]:
+        """Test method that loads Shopify salary data for Canada"""
+        logger.info("Running Shopify salary test for Canada")
+        url = "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
+        self.page.goto(url)
+        self.random_delay(1, 2)
+
+        # Check if we need to login
+        if "login" in self.page.url.lower():
+            logger.info("Hit login wall, attempting login...")
+            self.login()
+            # Return to the Shopify page
+            self.page.goto(url)
+            self.random_delay()
+
+        return self.find_and_extract_salaries()
+
+    def cleanup(self) -> None:
+        """Clean up browser resources"""
+        try:
+            if self.page.context:
+                self.page.context.close()
+            if self.browser:
+                self.browser.close()
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+
+    def random_delay(self, min_seconds=0.5, max_seconds=2):
+        """Add a random delay between actions"""
+        delay = random.uniform(min_seconds, max_seconds)
+        logger.debug(f"Waiting for {delay:.1f} seconds...")
+        time.sleep(delay)
+
+    def find_and_extract_salaries(self):
+        logger.info(f"Looking for salary table on {self.page.url}...")
+        self.salary_table = self.page.locator(
+            "table[aria-label='Salary Submissions']"
+        ).first
+        if not self.salary_table.is_visible(timeout=5000):
+            raise Exception(f"Could not find salary table on page {self.page.url}")
+        self._say_salary_data_added()
+        self._narrow_salary_search()
+        return self._extract_salary_data()
+
     def check_login_status(self) -> bool:
         """Check if we're logged in"""
         try:
@@ -153,21 +206,6 @@ class LevelsFyiSearcher:
             logger.error(f"Current URL: {self.page.url}")
             raise Exception(f"Levels.fyi login failed: {str(e)}")
 
-    def random_delay(self, min_seconds=0.5, max_seconds=2):
-        """Add a random delay between actions"""
-        delay = random.uniform(min_seconds, max_seconds)
-        logger.debug(f"Waiting for {delay:.1f} seconds...")
-        time.sleep(delay)
-
-    def main(self, company_name: str) -> List[Dict]:
-        """Main function to search for salary data at a company"""
-        # All of these work by side effects or raising exceptions
-        self.search_by_company_name(company_name)
-        self.random_delay()
-        self.navigate_to_salary_page()
-        self.random_delay()
-        return self.extract_salary_data()
-
     def search_by_company_name(self, company_name: str) -> None:
         """Search for salary data at specified company"""
         try:
@@ -249,7 +287,7 @@ class LevelsFyiSearcher:
                 logger.error(f"Failed to save error screenshot: {screenshot_error}")
             raise Exception(f"Error searching {company_name}: {e}")
 
-    def navigate_to_salary_page(self):
+    def _navigate_to_salary_page(self):
         # Wait for either the Software Engineer link or the salary page
         logger.info("Checking if we're on the main company page or salary page...")
 
@@ -272,13 +310,9 @@ class LevelsFyiSearcher:
             raise Exception("Could not find Software Engineer role on company page")
 
         self.random_delay()  # Wait for table to update
-        self.say_salary_data_added()
+        self._say_salary_data_added()
 
-    def say_salary_data_added(self):
-        logger.info("Looking for salary table...")
-        salary_table = self.page.locator("table[aria-label='Salary Submissions']").first
-        if not salary_table.is_visible(timeout=5000):
-            raise Exception("Could not find salary table on page")
+    def _say_salary_data_added(self):
         # Click the "Added mine already" button to reveal full salary data
         logger.info("Looking for 'Added mine already' button...")
         already_added_button = self.page.get_by_role(
@@ -295,10 +329,14 @@ class LevelsFyiSearcher:
             ive_shared_button.click()
             self.random_delay()
 
-    def extract_salary_data(self) -> List[Dict]:
+    def _extract_salary_data(self) -> List[Dict]:
+        """Extract salary data from the salary table,
+        assuming we've already navigated to the salary page
+        and narrowed the search to roles of interest.
+        """
         logger.info("Extracting salary data...")
 
-        table = self.page.locator("table[aria-label='Salary Submissions']")
+        table = self.salary_table
         rows = table.locator("tbody tr")
 
         logger.info(f"Found {len(rows.all())} total rows")
@@ -347,36 +385,10 @@ class LevelsFyiSearcher:
         logger.info(f"Successfully extracted {len(results)} valid salary entries")
         return results
 
-    def cleanup(self) -> None:
-        """Clean up browser resources"""
-        try:
-            if self.page.context:
-                self.page.context.close()
-            if self.browser:
-                self.browser.close()
-        except Exception as e:
-            print(f"Error during cleanup: {e}")
-
-    def test_shopify_salary(self) -> List[Dict]:
-        """Test method that loads Shopify salary data for Canada"""
-        logger.info("Running Shopify salary test for Canada")
-        self.page.goto(
-            "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
-        )
-        self.random_delay(1, 2)
-
-        # Check if we need to login
-        if "login" in self.page.url.lower():
-            logger.info("Hit login wall, attempting login...")
-            self.login()
-            # Return to the Shopify page
-            self.page.goto(
-                "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
-            )
-            self.random_delay()
-
-        self.say_salary_data_added()
-        return self.extract_salary_data()
+    def _narrow_salary_search(self):
+        logger.info("Narrowing salary search...")
+        # TODO: Implement narrowing logic
+        pass
 
 
 def main():
