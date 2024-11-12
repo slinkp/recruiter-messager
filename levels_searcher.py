@@ -182,7 +182,18 @@ class LevelsFyiSearcher:
 
             # Find and click the search box
             logger.info("Looking for search box...")
-            search_box = self.page.get_by_placeholder("Search for a company")
+            search_box = self.page.get_by_role(
+                "searchbox", name="Search by Company, Title, or City", exact=False
+            ).first
+
+            if not search_box.is_visible(timeout=1000):
+                logger.info("Trying alternate selector...")
+                search_box = self.page.locator("input.omnisearch-input").first
+
+            logger.info(
+                f"Found search box with placeholder: {search_box.get_attribute('placeholder')}"
+            )
+
             logger.info("Attempting to click search box...")
             search_box.click()
             logger.info("Search box clicked successfully")
@@ -190,18 +201,59 @@ class LevelsFyiSearcher:
             logger.info(f"Filling search box with: {company_name}")
             search_box.fill(company_name)
             logger.info("Search box filled")
+            self.random_delay()  # Wait for dropdown to appear
 
             # Wait for and click the company in dropdown
+            logger.info("Waiting for dropdown to appear...")
+            dropdown = self.page.wait_for_selector(".omnisearch-results", timeout=5000)
+            if not dropdown:
+                raise Exception("Dropdown menu never appeared")
+
             logger.info(f"Looking for company option: {company_name}")
-            company_option = self.page.get_by_text(company_name, exact=True).first
+            # Use a more specific selector to get the exact company match
+            company_option = self.page.get_by_role(
+                "link", name=company_name, exact=True
+            ).first
+
+            if not company_option.is_visible(timeout=5000):
+                raise Exception(
+                    f"Could not find exact match for {company_name} in dropdown"
+                )
+
+            self.random_delay()  # Default delay before clicking
+
             logger.info("Clicking company option...")
             company_option.click()
-            logger.info("Company option clicked")
 
-            # Wait for salary data to load
-            logger.info("Waiting for salary data table...")
-            self.page.wait_for_selector(".table-container")
-            logger.info("Salary data table found")
+            logger.info("Company option clicked")
+            self.random_delay()  # Slightly longer delay for data to load
+
+            # Wait for either the Software Engineer link or the salary table
+            logger.info("Checking if we're on the main company page or salary page...")
+
+            try:
+                # Look for Software Engineer link by its heading and href pattern
+                swe_link = (
+                    self.page.get_by_role("link", name="Software Engineer", exact=False)
+                    .filter(has=self.page.locator("h6:has-text('Software Engineer')"))
+                    .first
+                )
+
+                if swe_link.is_visible(timeout=5000):
+                    logger.info("Found Software Engineer link, clicking it...")
+                    swe_link.click()
+                    self.random_delay()  # Wait for navigation
+                else:
+                    raise Exception("Software Engineer link not visible")
+            except Exception as e:
+                logger.error(f"Could not find Software Engineer link: {e}")
+                raise Exception("Could not find Software Engineer role on company page")
+
+            # Now we should be on the salary page
+            logger.info("Looking for salary data...")
+            salary_table = self.page.locator("table").first
+            if not salary_table.is_visible(timeout=5000):
+                raise Exception("Could not find salary table on page")
 
             # Extract salary data
             logger.info("Extracting salary data...")
