@@ -295,23 +295,27 @@ class LevelsFyiSearcher:
             ive_shared_button.click()
             self.random_delay()
 
-        logger.info("Looking for salary table...")
-        salary_table = self.page.locator("table[aria-label='Salary Submissions']").first
-        if not salary_table.is_visible(timeout=5000):
-            raise Exception("Could not find salary table on page")
-
     def extract_salary_data(self) -> List[Dict]:
         logger.info("Extracting salary data...")
-        rows = self.page.locator("tr.table-row")
+        rows = self.page.locator("tr.salary-row_collapsedSalaryRow__IQ3om")
         logger.info(f"Found {len(rows.all())} salary entries")
 
         results = []
         for i, row in enumerate(rows.all()):
             try:
                 data = {
-                    "title": row.locator(".title-cell").inner_text(),
-                    "level": row.locator(".level-cell").inner_text(),
-                    "total_comp": row.locator(".total-cell").inner_text(),
+                    "title": row.locator(".salary-row_levelName____tz6").inner_text(),
+                    "level": row.locator("td:nth-child(2) p").inner_text(),  # L5, etc
+                    "total_comp": row.locator(
+                        ".salary-row_totalCompCell__553Rk p"
+                    ).inner_text(),
+                    # Optional: Add more fields
+                    "location": row.locator(
+                        "td:nth-child(1) .MuiTypography-caption"
+                    ).inner_text(),
+                    "breakdown": row.locator(
+                        ".salary-row_totalCompCell__553Rk .MuiTypography-caption"
+                    ).inner_text(),
                 }
                 results.append(data)
                 logger.info(f"Parsed row {i+1}: {data}")
