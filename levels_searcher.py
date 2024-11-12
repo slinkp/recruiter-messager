@@ -259,15 +259,12 @@ class LevelsFyiSearcher:
                 raise Exception("Dropdown menu never appeared")
 
             logger.info(f"Looking for company option: {company_name}")
-            # Use a more specific selector to get the exact company match
             company_option = self.page.get_by_role(
-                "link", name=company_name, exact=True
+                "link", name=company_name, exact=False
             ).first
 
             if not company_option.is_visible(timeout=5000):
-                raise Exception(
-                    f"Could not find exact match for {company_name} in dropdown"
-                )
+                raise Exception(f"Could not find match for {company_name} in dropdown")
 
             self.random_delay()  # Default delay before clicking
 
