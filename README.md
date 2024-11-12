@@ -213,3 +213,21 @@ Here is the requested JSON response for Rokt:
 ```
 Rokt is a private company headquartered in New York City with approximately 600 employees. Their work policy is hybrid, requiring employees to work onsite for at least three days a week​
 ```
+
+### Levels.fyi info
+
+A complete list of info from a levels.fyi entry - how much do i really need?
+
+```
+company:  Shopify
+location: Montreal, QC, Canada
+date: 3 days ago - OR - 11/03/2024
+level: L6
+role: Distributed Systems (Back-End)
+years of experience: 7 yrs
+years at company: 3 yrs
+total comp: $167,961
+base salary: $160.8k
+stock: $7.2k
+bonus: N/A
+```
