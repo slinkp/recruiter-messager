@@ -4,6 +4,7 @@ import time
 import logging
 from typing import List, Dict
 from pathlib import Path
+import random
 
 # Configure logging
 logging.basicConfig(
@@ -151,6 +152,12 @@ class LevelsFyiSearcher:
             logger.error(f"Current URL: {self.page.url}")
             raise Exception(f"Levels.fyi login failed: {str(e)}")
 
+    def random_delay(self, min_seconds=0.5, max_seconds=2):
+        """Add a random delay between actions"""
+        delay = random.uniform(min_seconds, max_seconds)
+        logger.debug(f"Waiting for {delay:.1f} seconds...")
+        time.sleep(delay)
+
     def search_company(self, company_name: str) -> List[Dict]:
         """Search for salary data at specified company"""
         try:
@@ -159,6 +166,7 @@ class LevelsFyiSearcher:
             # Go to levels.fyi
             logger.info("Navigating to levels.fyi homepage")
             self.page.goto("https://www.levels.fyi/")
+            self.random_delay(1, 2)  # Slightly longer delay after page load
 
             # Log current URL and login status
             logger.info(f"Current URL: {self.page.url}")
