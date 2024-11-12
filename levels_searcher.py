@@ -5,6 +5,7 @@ import logging
 from typing import List, Dict
 from pathlib import Path
 import random
+import sys
 
 # Configure logging
 logging.basicConfig(
@@ -270,6 +271,14 @@ class LevelsFyiSearcher:
             logger.error(f"Could not find Software Engineer link: {e}")
             raise Exception("Could not find Software Engineer role on company page")
 
+        self.random_delay()  # Wait for table to update
+        self.say_salary_data_added()
+
+    def say_salary_data_added(self):
+        logger.info("Looking for salary table...")
+        salary_table = self.page.locator("table[aria-label='Salary Submissions']").first
+        if not salary_table.is_visible(timeout=5000):
+            raise Exception("Could not find salary table on page")
         # Click the "Added mine already" button to reveal full salary data
         logger.info("Looking for 'Added mine already' button...")
         already_added_button = self.page.get_by_role(
@@ -278,8 +287,7 @@ class LevelsFyiSearcher:
         if already_added_button.is_visible(timeout=3000):
             logger.info("Clicking 'Added mine already' button...")
             already_added_button.click()
-        self.random_delay()  # Wait for table to update
-
+            self.random_delay()
         # Secondary button that sometimes appears with "Thank you"
         ive_shared_button = self.page.get_by_role("button", name="I've Shared").first
         if ive_shared_button.is_visible(timeout=3000):
@@ -324,15 +332,46 @@ class LevelsFyiSearcher:
         except Exception as e:
             print(f"Error during cleanup: {e}")
 
+    def test_shopify_salary(self) -> List[Dict]:
+        """Test method that loads Shopify salary data for Canada"""
+        logger.info("Running Shopify salary test for Canada")
+        self.page.goto(
+            "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
+        )
+        self.random_delay(1, 2)
+
+        # Check if we need to login
+        if "login" in self.page.url.lower():
+            logger.info("Hit login wall, attempting login...")
+            self.login()
+            # Return to the Shopify page
+            self.page.goto(
+                "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
+            )
+            self.random_delay()
+
+        self.say_salary_data_added()
+        return self.extract_salary_data()
+
 
 def main():
     searcher = LevelsFyiSearcher()
     try:
-        # Then search
-        results = searcher.main("Shopify")
+        results = []
+        if len(sys.argv) > 1:
+            # If company name provided as argument
+            company_name = sys.argv[1].lower()
+            logger.info(f"Searching for company: {company_name}")
+            results = searcher.main(company_name)
+        else:
+            # Default to Shopify test case
+            logger.info("No company specified, running Shopify test")
+            results = searcher.test_shopify_salary()
+
         # Print results
         for result in results:
             print(f"{result['title']} ({result['level']}): {result['total_comp']}")
+        time.sleep(10)
 
     finally:
         searcher.cleanup()
