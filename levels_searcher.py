@@ -158,7 +158,16 @@ class LevelsFyiSearcher:
         logger.debug(f"Waiting for {delay:.1f} seconds...")
         time.sleep(delay)
 
-    def search_company(self, company_name: str) -> List[Dict]:
+    def main(self, company_name: str) -> List[Dict]:
+        """Main function to search for salary data at a company"""
+        # All of these work by side effects or raising exceptions
+        self.search_by_company_name(company_name)
+        self.random_delay()
+        self.navigate_to_salary_page()
+        self.random_delay()
+        return self.extract_salary_data()
+
+    def search_by_company_name(self, company_name: str) -> None:
         """Search for salary data at specified company"""
         try:
             logger.info(f"Starting search for company: {company_name}")
@@ -186,6 +195,7 @@ class LevelsFyiSearcher:
                 "searchbox", name="Search by Company, Title, or City", exact=False
             ).first
 
+            # If that doesn't work, fallback to:
             if not search_box.is_visible(timeout=1000):
                 logger.info("Trying alternate selector...")
                 search_box = self.page.locator("input.omnisearch-input").first
@@ -226,69 +236,7 @@ class LevelsFyiSearcher:
             company_option.click()
 
             logger.info("Company option clicked")
-            self.random_delay()  # Slightly longer delay for data to load
-
-            # Wait for either the Software Engineer link or the salary page
-            logger.info("Checking if we're on the main company page or salary page...")
-
-            try:
-                # Look for Software Engineer link by its heading and href pattern
-                swe_link = (
-                    self.page.get_by_role("link", name="Software Engineer", exact=False)
-                    .filter(has=self.page.locator("h6:has-text('Software Engineer')"))
-                    .first
-                )
-
-                if swe_link.is_visible(timeout=5000):
-                    logger.info("Found Software Engineer link, clicking it...")
-                    swe_link.click()
-                    self.random_delay()  # Wait for navigation
-                else:
-                    raise Exception("Software Engineer link not visible")
-            except Exception as e:
-                logger.error(f"Could not find Software Engineer link: {e}")
-                raise Exception("Could not find Software Engineer role on company page")
-
-            # Click the "Added mine already" button to reveal full salary data
-            logger.info("Looking for 'Added mine already' button...")
-            already_added_button = self.page.get_by_role(
-                "button", name="Added mine already within last 1 year"
-            ).first
-
-            logger.info("Clicking 'Added mine already' button...")
-            already_added_button.click()
-            self.random_delay()  # Wait for table to update
-
-            # Now look for salary data in the specific table
-            logger.info("Looking for salary table...")
-            salary_table = self.page.locator(
-                "table[aria-label='Salary Submissions']"
-            ).first
-            if not salary_table.is_visible(timeout=5000):
-                raise Exception("Could not find salary table on page")
-
-            # Extract salary data
-            logger.info("Extracting salary data...")
-            rows = self.page.locator("tr.table-row")
-            logger.info(f"Found {len(rows.all())} salary entries")
-
-            results = []
-            for i, row in enumerate(rows.all()):
-                try:
-                    data = {
-                        "title": row.locator(".title-cell").inner_text(),
-                        "level": row.locator(".level-cell").inner_text(),
-                        "total_comp": row.locator(".total-cell").inner_text(),
-                    }
-                    results.append(data)
-                    logger.debug(f"Parsed row {i+1}: {data}")
-                except Exception as e:
-                    logger.error(f"Error parsing row {i+1}: {e}")
-                    continue
-
-            logger.info(f"Successfully extracted {len(results)} salary entries")
-            return results
-
+            self.random_delay()
         except Exception as e:
             logger.error(f"Error during company search: {e}")
             logger.error(f"Current URL when error occurred: {self.page.url}")
@@ -299,6 +247,72 @@ class LevelsFyiSearcher:
             except Exception as screenshot_error:
                 logger.error(f"Failed to save error screenshot: {screenshot_error}")
             raise Exception(f"Error searching {company_name}: {e}")
+
+    def navigate_to_salary_page(self):
+        # Wait for either the Software Engineer link or the salary page
+        logger.info("Checking if we're on the main company page or salary page...")
+
+        try:
+            # Look for Software Engineer link by its heading and href pattern
+            swe_link = (
+                self.page.get_by_role("link", name="Software Engineer", exact=False)
+                .filter(has=self.page.locator("h6:has-text('Software Engineer')"))
+                .first
+            )
+
+            if swe_link.is_visible(timeout=5000):
+                logger.info("Found Software Engineer link, clicking it...")
+                swe_link.click()
+                self.random_delay()  # Wait for navigation
+            else:
+                raise Exception("Software Engineer link not visible")
+        except Exception as e:
+            logger.error(f"Could not find Software Engineer link: {e}")
+            raise Exception("Could not find Software Engineer role on company page")
+
+        # Click the "Added mine already" button to reveal full salary data
+        logger.info("Looking for 'Added mine already' button...")
+        already_added_button = self.page.get_by_role(
+            "button", name="Added mine already within last 1 year"
+        ).first
+        if already_added_button.is_visible(timeout=3000):
+            logger.info("Clicking 'Added mine already' button...")
+            already_added_button.click()
+        self.random_delay()  # Wait for table to update
+
+        # Secondary button that sometimes appears with "Thank you"
+        ive_shared_button = self.page.get_by_role("button", name="I've Shared").first
+        if ive_shared_button.is_visible(timeout=3000):
+            logger.info("Clicking 'I've Shared' button...")
+            ive_shared_button.click()
+            self.random_delay()
+
+        logger.info("Looking for salary table...")
+        salary_table = self.page.locator("table[aria-label='Salary Submissions']").first
+        if not salary_table.is_visible(timeout=5000):
+            raise Exception("Could not find salary table on page")
+
+    def extract_salary_data(self) -> List[Dict]:
+        logger.info("Extracting salary data...")
+        rows = self.page.locator("tr.table-row")
+        logger.info(f"Found {len(rows.all())} salary entries")
+
+        results = []
+        for i, row in enumerate(rows.all()):
+            try:
+                data = {
+                    "title": row.locator(".title-cell").inner_text(),
+                    "level": row.locator(".level-cell").inner_text(),
+                    "total_comp": row.locator(".total-cell").inner_text(),
+                }
+                results.append(data)
+                logger.info(f"Parsed row {i+1}: {data}")
+            except Exception as e:
+                logger.error(f"Error parsing row {i+1}: {e}")
+                continue
+
+        logger.info(f"Successfully extracted {len(results)} salary entries")
+        return results
 
     def cleanup(self) -> None:
         """Clean up browser resources"""
@@ -315,8 +329,7 @@ def main():
     searcher = LevelsFyiSearcher()
     try:
         # Then search
-        results = searcher.search_company("Shopify")
-
+        results = searcher.main("Shopify")
         # Print results
         for result in results:
             print(f"{result['title']} ({result['level']}): {result['total_comp']}")
