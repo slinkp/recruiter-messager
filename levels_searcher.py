@@ -100,6 +100,7 @@ class LevelsFyiSearcher:
         if not self.salary_table.is_visible(timeout=5000):
             raise Exception(f"Could not find salary table on page {self.page.url}")
         self._say_salary_data_added()
+        self.random_delay()
         self._narrow_salary_search()
         return self._extract_salary_data()
 
@@ -382,8 +383,50 @@ class LevelsFyiSearcher:
         logger.info(f"Successfully extracted {len(results)} valid salary entries")
         return results
 
+    def _toggle_search_filters(self):
+        """Opens or closes the salary search filters menu."""
+        logger.info("Toggling search filters...")
+
+        # First check if filters are already open
+        try:
+            # Look for the filter widget by ID
+            filter_widget = self.page.locator("#search-filters").first
+            is_open = filter_widget.is_visible(timeout=1000)
+            logger.info(f"Filter menu is currently {'open' if is_open else 'closed'}")
+
+            if not is_open:
+                # Try multiple selectors to find and click the filter button
+                filter_button = None
+                # Try by ID first (most reliable)
+                filter_button = self.page.locator("#toggle-search-filters").first
+                if not filter_button.is_visible(timeout=1000):
+                    # Try by aria-label
+                    filter_button = self.page.get_by_role(
+                        "button", name="Toggle Search Filters"
+                    ).first
+                if not filter_button.is_visible(timeout=1000):
+                    # Try by text content
+                    filter_button = self.page.get_by_role(
+                        "button", name="Table Filter"
+                    ).first
+
+                logger.info("Clicking filter button to open menu...")
+                filter_button.click()
+                self.random_delay()
+
+                # Verify it opened
+                if not filter_widget.is_visible(timeout=3000):
+                    raise Exception("Filter menu did not open after clicking")
+
+        except Exception as e:
+            logger.error(f"Failed to toggle filter menu: {e}")
+            raise Exception("Could not toggle filter menu")
+
     def _narrow_salary_search(self):
         logger.info("Narrowing salary search...")
+        self._toggle_search_filters()
+
+        # Rest of filtering logic will go here...
         # 0. need an algorithm to count results.
         # My approximate filtering algorithm: do these one at a time,
         # until there are too few, and then back up one step
