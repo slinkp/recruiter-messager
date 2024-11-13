@@ -33,86 +33,67 @@ class ResearchAgent:
         return result["output"]
 
 
-HEADCOUNT_PROMPT = """
+BASIC_COMPANY_PROMPT = """
 For the company {company_name}, find:
-   - the number of employees
+   - the total number of employees worldwide 
    - the number of employees at the NYC office, if there is one.
    - the number of employees who are egineers, if known.
+   - the company's latest valuation, in millions of dollars, if known.
+   - the company's public/private status.  If private and valued at over $1B, call it a "unicorn".
+   - the most recent funding round (eg "Series A", "Series B", etc.) if private.
+   - the city and country of the company's headquarters
+   - the address of the company's NYC office, if there is one
    - the URLs of the pages that contain the information above
-Return these results as a valid JSON object, with the following keys:
-    - headcount
-    - headcount_nyc
-    - headcount_engineers
-    - citation_urls
 
-Values of other keys should be integers, if known. If value is not known, it should be null.
-"""
-
-OFFICE_PROMPT = """
-For the company {company_name}, find:
-    - the city of the company's headquarters
-    - address of the company's New York City metro area office, if there is one
-    - the company's remote work policy
-    - the URLs of the pages that contain the information above
-
-Return these results as a valid JSON object, with the following keys:
-    - headquarters_city
-    - nyc_office_address
-    - remote_work_policy
-    - citation_urls
-
-Values should be strings, if known. If value is not known, it should be null.
-The remote work policy should be one of the following:
-    - "hybrid"
-    - "remote"
-    - "in-person"
-    - null
+Return these results as a valid JSON object, with the following keys and data types:
+    - headcount: integer or null
+    - headcount_nyc: integer or null
+    - headcount_engineers: integer or null
+    - valuation: integer or null
+    - public_status: string "public", "private", "private unicorn" or null
+    - funding_series: string or null
+    - headquarters_city: string or null
+    - nyc_office_address: string or null
+    - citation_urls: list of strings
 
 The value of nyc_office_address, if known, must be returned as a valid US mailing address with a street address, 
 city, state, and zip code.
 The value of headquarters_city must be the city, state/province, and country of the company's headquarters, if known.
 """
 
-MISSION_PROMPT = """
-What is the homepage, industry and mission of {company_name}?
-You must always output a valid JSON object with keys:
-  - "homepage"
-  - "mission"
-  - "industry"
-  - "citation_urls"
+EMPLOYMENT_PROMPT = """
+For the company {company_name}, find:
+    - the company's remote work policy
+    - whether the company is currently hiring backend engineers
+    - whether the company is hiring backend engineers with AI experience
+    - whether engineers are expected to do a systems design interview
+    - whether engineers are expected to do a leetcode style coding interview
+    - the URL of the company's primary jobs page, preferably on their own website, if known.
+    - the URLs of the pages that contain the information above
 
-Set values to null if unknown.
+Return these results as a valid JSON object, with the following keys and data types:
+    - remote_work_policy: string "hybrid", "remote", "in-person", or null
+    - hiring_status: boolean or null
+    - hiring_status_ai: boolean or null
+    - interview_style_systems: boolean or null
+    - interview_style_leetcode: boolean or null
+    - jobs_homepage_url: string or null
+    - citation_urls: list of strings
 """
 
-HIRING_PROMPT = """
-What is the hiring status of {company_name}?
-You must output JSON with these keys:
-    - hiring_status
-    - jobs_homepage_url
-    - citation_urls
+AI_MISSION_PROMPT = """
+Is {company_name} a company that uses AI?
+Look for blog posts, press releases, news articles, etc. about whether and how AI 
+is used for the company's products or services, whether as public-facing features or
+internal implementation. Another good clue is whether the company is hiring AI engineers.
 
-Hiring status should be a boolean that's true if the company is hiring, false if not, or null if unknown.
-jobs_homepage_url should be the URL of the company's primary jobs page, preferably on their own website, if known.
-Set values to null if unknown.
-"""
+Return the result as a valid JSON object with the following keys and data types:
+  - uses_ai: boolean or null
+  - ai_notes: string or null
+  - citation_urls: list of strings
 
-FUNDING_PROMPT = """
-What is the funding status of {company_name}?
-You must output JSON with these keys:
-    - funding_status
-    - funding_series
-    - valuation
-    - valuation_date
-    - stock_symbol
-    - unicorn_status
-    - citation_urls
-
-funding_status must be one of "public" or "private", or null if unkown.
-funding_series should be a string such as "Series A", "Series B", etc. if known and the company is private, otherwise null.
-"valuation" should be an integer in millions of dollars if known.
-"valuation_date" should be a string in YYYY-MM-DD format if known, otherwise null.
-"stock_symbol" should be a string if known, otherwise null.
-"unicorn_status" should be a boolean that's true, if the company is worth over $1 billion USD, false if less, null if unknown.
+ai_notes should be a short summary (no more than 100 words)
+of how AI is used by the company, or null if the company does not use AI.
 """
 
 
@@ -126,18 +107,17 @@ def make_prompt(prompt: str, **kwargs):
             "",
             "You must always output a valid JSON object with exactly the keys specified in the prompt.",
             "citation_urls should always be a list of strings of URLs that contain the information above.",
-            "If any string json value other than a citation url is longer than 80 characters, write a shorter summary of the value.",
-            "Return ONLY the JSON object, nothing else.",
+            "If any string json value other than a citation url is longer than 80 characters, write a shorter summary of the value",
+            "unless otherwise clearly specified in the prompt.",
+            "Return ONLY the valid JSON object, nothing else.",
         ]
     )
 
 
 COMPANY_PROMPTS = [
-    MISSION_PROMPT,
-    FUNDING_PROMPT,
-    OFFICE_PROMPT,
-    HEADCOUNT_PROMPT,
-    HIRING_PROMPT,
+    BASIC_COMPANY_PROMPT,
+    EMPLOYMENT_PROMPT,
+    AI_MISSION_PROMPT,
 ]
 
 
