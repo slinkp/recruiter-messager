@@ -176,15 +176,16 @@ class LevelsFyiSearcher:
             google_button.click()
             logger.info("Clicked Google login button")
 
-            logger.info("\n=== MANUAL LOGIN REQUIRED ===")
-            logger.info("1. Please complete the Google login in the browser window")
-            logger.info("2. This may include:")
-            logger.info("   - Entering your Google email")
-            logger.info("   - Entering your password")
-            logger.info("   - Completing 2FA if enabled")
-            logger.info("3. After you see you're logged into Levels.fyi, return here")
+            print("\n=== MANUAL LOGIN REQUIRED ===")
+            print("1. Please complete the Google login in the browser window")
+            print("2. This may include:")
+            print("   - Entering your Google email")
+            print("   - Entering your password")
+            print("   - Completing 2FA if enabled")
+            print("3. After you see you're logged into Levels.fyi, return here")
 
             input("\nPress Enter ONLY after you're fully logged into Levels.fyi... ")
+
             logger.info("User indicated login is complete")
 
             time.sleep(3)
@@ -534,17 +535,14 @@ def main():
             # Default to Shopify test case
             logger.info("No company specified, running Shopify test")
             results = searcher.test_shopify_salary()
-
-        # Print results
-        for result in results:
-            print(
-                f"{result['level']} {result['role']} ({result['experience']}): {result['total_comp']} - {result['location']}"
-            )
-        time.sleep(3)
-
+        yield from results
     finally:
         searcher.cleanup()
 
 
 if __name__ == "__main__":
-    main()
+    import pprint
+
+    for i, result in enumerate(main()):
+        print(f"{i+1}:")
+        pprint.pprint(result)
