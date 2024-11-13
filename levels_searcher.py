@@ -486,15 +486,15 @@ class LevelsFyiSearcher:
             logger.error(f"Failed to set United States filter: {e}")
             raise Exception("Could not set location filter")
 
-        # 0. need an algorithm to count results.
         # My approximate filtering algorithm: do these one at a time,
         # until there are too few, and then back up one step
-        # 2. years of experience: click Senior.
-        # 3. experience: click New Offer Only.
-        # 4. location: unclick US, click Greater NYC Area.
-        # 5. time range: click past 2 years.
-        # 6. time range: click past 1 year.
-        # 7. Sort by: total comp (have to click twice?)
+        # TODO:
+        # 1. experience: click New Offer Only.
+        # 2. location: unclick US, click Greater NYC Area.
+        # 3. time range: click past 2 years.
+        # 4. years of experience: enter 10 in the min years field, iterate downward
+        # 5. time range: click past 1 year.
+        # 6. Sort by: total comp (have to click twice?)
 
     def _get_salary_result_count(self) -> int:
         """Gets the total number of salary results from the pagination text."""
