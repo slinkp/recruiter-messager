@@ -483,14 +483,34 @@ class LevelsFyiSearcher:
                 us_checkbox.click()
                 self.random_delay()
 
+            # Add New Offer Only filter
+            logger.info("Looking for New Offer Only checkbox...")
+            new_offer_checkbox = filter_widget.get_by_role(
+                "checkbox", name="New Offer Only"
+            ).first
+
+            if new_offer_checkbox.is_visible(timeout=3000):
+                logger.info("Clicking New Offer Only checkbox...")
+                new_offer_checkbox.click()
+                self.random_delay()
+
+                # Check results after New Offer filter
+                new_offer_count = self._get_salary_result_count()
+                logger.info(f"After New Offer filter: {new_offer_count} results")
+                if new_offer_count < MIN_RESULTS:
+                    logger.info(
+                        "Not enough results after New Offer filter, unclicking..."
+                    )
+                    new_offer_checkbox.click()
+                    self.random_delay()
+
         except Exception as e:
-            logger.error(f"Failed to set United States filter: {e}")
-            raise Exception("Could not set location filter")
+            logger.error(f"Failed to set filters: {e}")
+            raise Exception("Could not set filters")
 
         # My approximate filtering algorithm: do these one at a time,
         # until there are too few, and then back up one step
         # TODO:
-        # 1. experience: click New Offer Only.
         # 2. location: unclick US, click Greater NYC Area.
         # 3. time range: click past 2 years.
         # 4. years of experience: enter 10 in the min years field, iterate downward
