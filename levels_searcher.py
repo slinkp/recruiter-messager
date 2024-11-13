@@ -444,6 +444,15 @@ class LevelsFyiSearcher:
 
     def _narrow_salary_search(self):
         logger.info("Narrowing salary search...")
+
+        MIN_RESULTS = 5
+        # Get initial result count
+        initial_count = self._get_salary_result_count()
+        logger.info(f"Starting with {initial_count} results")
+        if initial_count < MIN_RESULTS:
+            logger.info("Not enough results to narrow search")
+            return
+
         filter_widget = self._toggle_search_filters()
 
         try:
@@ -465,6 +474,14 @@ class LevelsFyiSearcher:
             if not us_checkbox.is_checked():
                 raise Exception("Failed to select United States checkbox")
 
+            # Check how many results we have after US filter
+            us_count = self._get_salary_result_count()
+            logger.info(f"After US filter: {us_count} results")
+            if us_count < MIN_RESULTS:
+                logger.info("Not enough results after US filter, unclicking...")
+                us_checkbox.click()
+                self.random_delay()
+
         except Exception as e:
             logger.error(f"Failed to set United States filter: {e}")
             raise Exception("Could not set location filter")
@@ -478,6 +495,30 @@ class LevelsFyiSearcher:
         # 5. time range: click past 2 years.
         # 6. time range: click past 1 year.
         # 7. Sort by: total comp (have to click twice?)
+
+    def _get_salary_result_count(self) -> int:
+        """Gets the total number of salary results from the pagination text."""
+        logger.info("Getting total result count...")
+        try:
+            # Find the pagination text within the salary table
+            pagination_text = self.salary_table.locator(
+                "text=/\\d+ - \\d+ of [\\d,]+/"
+            ).first
+            if not pagination_text.is_visible(timeout=3000):
+                # TODO: just count the rows instead.
+                raise Exception("Could not find pagination text")
+
+            # Extract the total count (the last number)
+            text = pagination_text.inner_text()
+            total = text.split(" of ")[1].replace(",", "")
+            count = int(total)
+
+            logger.info(f"Found {count} total results")
+            return count
+
+        except Exception as e:
+            logger.error(f"Failed to get result count: {e}")
+            raise Exception("Could not determine number of results")
 
 
 def main():
