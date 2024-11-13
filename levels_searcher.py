@@ -321,7 +321,8 @@ class SalarySearcher:
         self._say_salary_data_added()
         self.random_delay()
         self._narrow_salary_search()
-        return self._extract_salary_data()
+        for row in self._extract_salary_data():
+            yield self._postprocess_salary_row(row)
 
     def random_delay(self, min_seconds=0.6, max_seconds=3):
         """Add a random delay between actions"""
@@ -402,6 +403,34 @@ class SalarySearcher:
         logger.info(f"Successfully extracted {len(results)} valid salary entries")
         return results
 
+    def _postprocess_salary_row(self, data: Dict) -> Dict:
+        """Postprocess salary data to clean up and add some derived fields."""
+        logger.info("Postprocessing salary data...")
+        # Example dict:
+        # {'breakdown': '177K | 59K | N/A',
+        #  'experience': '7 yrs',
+        #  'level': 'L6',
+        #  'location': 'New York, NY | 12/13/2023',
+        #  'role': 'ML / AI',
+        #  'total_comp': '$236,000'}
+        salary, equity, bonus = data["breakdown"].split(" | ")
+        salary = 0 if salary == "N/A" else float(salary.rstrip("K")) * 1000
+        equity = 0 if equity == "N/A" else float(equity.rstrip("K")) * 1000
+        bonus = 0 if bonus == "N/A" else float(bonus.rstrip("K")) * 1000
+        tc = int(data["total_comp"].replace("$", "").replace(",", ""))
+
+        parsed = {
+            "total_comp": tc,
+            "salary": salary,
+            "equity": equity,
+            "bonus": bonus,
+        }
+        location, date = data["location"].split(" | ")
+        parsed["location"] = location
+        parsed["date"] = date
+        data.update(parsed)
+        return data
+
     def _toggle_search_filters(self):
         """Opens or closes the salary search filters menu."""
         logger.info("Toggling search filters...")
@@ -463,6 +492,10 @@ class SalarySearcher:
 
     def _narrow_salary_search(self):
         logger.info("Narrowing salary search...")
+        # My approximate filtering algorithm: do these filters one at a time,
+        # until there are too few, and then back up one step
+        # TODO: refactor to DRY up the boilerplate
+        # TODO: not crazy about Cursor's exception pattern here
 
         MIN_RESULTS = 5
         # Get initial result count
@@ -598,14 +631,9 @@ class SalarySearcher:
             logger.error(f"Failed to set filters: {e}")
             raise Exception("Could not set filters")
 
-        # My approximate filtering algorithm: do these one at a time,
-        # until there are too few, and then back up one step
         # TODO:
-        # 2. location: unclick US, click Greater NYC Area.
-        # 3. time range: click past 2 years.
-        # 4. years of experience: enter 10 in the min years field, iterate downward
-        # 5. time range: click past 1 year.
-        # 6. Sort by: total comp (have to click twice?)
+        # - years of experience: enter 10 in the min years field, iterate downward
+        # - Sort by: total comp (have to click twice?)
 
     def _get_salary_result_count(self) -> int:
         """Gets the total number of salary results from the pagination text."""
