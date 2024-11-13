@@ -92,17 +92,10 @@ class LevelsFyiSearcher:
         logger.debug(f"Waiting for {delay:.1f} seconds...")
         time.sleep(delay)
 
-    def find_and_extract_salaries(self):
-        logger.info(f"Looking for salary table on {self.page.url}...")
-        self.salary_table = self.page.locator(
-            "table[aria-label='Salary Submissions']"
-        ).first
-        if not self.salary_table.is_visible(timeout=5000):
-            raise Exception(f"Could not find salary table on page {self.page.url}")
-        self._say_salary_data_added()
-        self.random_delay()
-        self._narrow_salary_search()
-        return self._extract_salary_data()
+    def find_and_extract_salaries(self) -> List[Dict]:
+        self._navigate_to_salary_page()
+        searcher = SalarySearcher(self.page)
+        return searcher.get_salary_data()
 
     def check_login_status(self) -> bool:
         """Check if we're logged in"""
@@ -290,6 +283,11 @@ class LevelsFyiSearcher:
         # Wait for either the Software Engineer link or the salary page
         logger.info("Checking if we're on the main company page or salary page...")
 
+        if "salaries/software-engineer" in self.page.url:
+            logger.info("Already on salary page, skipping navigation...")
+            return
+
+        logger.info(f"Current URL: {self.page.url}")
         try:
             # Look for Software Engineer link by its heading and href pattern
             swe_link = (
@@ -308,8 +306,28 @@ class LevelsFyiSearcher:
             logger.error(f"Could not find Software Engineer link: {e}")
             raise Exception("Could not find Software Engineer role on company page")
 
-        self.random_delay()  # Wait for table to update
+class SalarySearcher:
+    def __init__(self, page):
+        self.page = page
+        assert "salaries/software-engineer" in self.page.url
+        self.salary_table = self.page.locator(
+            "table[aria-label='Salary Submissions']"
+        ).first
+        if not self.salary_table.is_visible(timeout=5000):
+            raise Exception(f"Could not find salary table on page {self.page.url}")
+
+    def get_salary_data(self):
+        logger.info(f"Looking for salary table on {self.page.url}...")
         self._say_salary_data_added()
+        self.random_delay()
+        self._narrow_salary_search()
+        return self._extract_salary_data()
+
+    def random_delay(self, min_seconds=0.6, max_seconds=3):
+        """Add a random delay between actions"""
+        delay = random.uniform(min_seconds, max_seconds)
+        logger.debug(f"Waiting for {delay:.1f} seconds...")
+        time.sleep(delay)
 
     def _say_salary_data_added(self):
         # Click the "Added mine already" button to reveal full salary data
