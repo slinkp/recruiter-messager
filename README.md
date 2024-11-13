@@ -213,3 +213,27 @@ Here is the requested JSON response for Rokt:
 ```
 Rokt is a private company headquartered in New York City with approximately 600 employees. Their work policy is hybrid, requiring employees to work onsite for at least three days a week​
 ```
+
+
+# Tavily strategy: One big prompt or multiple?
+
+I wasn't sure which way to go and experimenting was inconclusive. 
+So I asked Tavily!
+Prompt was:
+
+```
+I'm using Tavily API to write my own research assistant that finds publicly
+available data about multiple companies.   The information is in multiple
+categories that are likely found on different sources across the web. Examples
+include:  Is the company public or private? What's its valuation? How many
+employees?  Where is the URL of their jobs page?  Where is their headquarters?
+What is their remote work policy?  For engineers, do they do leetcode-style
+interviews?  If there is a NYC office, what is its address?   What is their
+technology stack for backend roles?  Do they have a strategy for integrating AI
+into their business?   My question for you is:  Is it better to do one Tavily
+prompt that asks for all this information, or break it down into multiple
+questions?  What are the pros and cons of each approach? Is there another
+approach I should consider? 
+```
+
+Response is in tavily-prompt-strategy.md
