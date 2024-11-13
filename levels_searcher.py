@@ -33,7 +33,7 @@ class LevelsFyiSearcher:
                 "--disable-dev-shm-usage",
                 "--enable-sandbox",
             ],
-            ignore_default_args=["--enable-automation"],
+            ignore_default_args=["--enable-automation", "--no-sandbox"],
         )
         logger.info("Browser context launched")
 
