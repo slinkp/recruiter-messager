@@ -504,6 +504,78 @@ class LevelsFyiSearcher:
                     new_offer_checkbox.click()
                     self.random_delay()
 
+            # Try Greater NYC Area filter
+            logger.info("Looking for Greater NYC Area checkbox...")
+            # First uncheck US if it's checked
+            us_checkbox = filter_widget.get_by_role(
+                "checkbox", name="United States"
+            ).first
+            if us_checkbox.is_checked():
+                logger.info("Unchecking United States...")
+                us_checkbox.click()
+                self.random_delay()
+
+            nyc_checkbox = filter_widget.get_by_role(
+                "checkbox", name="Greater NYC Area"
+            ).first
+
+            if nyc_checkbox.is_visible(timeout=3000):
+                logger.info("Clicking Greater NYC Area checkbox...")
+                nyc_checkbox.click()
+                self.random_delay()
+
+                # Check results after NYC filter
+                nyc_count = self._get_salary_result_count()
+                logger.info(f"After NYC filter: {nyc_count} results")
+                if nyc_count < MIN_RESULTS:
+                    logger.info("Not enough results after NYC filter, unclicking...")
+                    nyc_checkbox.click()
+                    # If NYC didn't work, recheck US
+                    us_checkbox.click()
+                    self.random_delay()
+
+            # Add Past 1 Year filter, then try Past 2 Years if needed
+            logger.info("Looking for time range radio buttons...")
+
+            # Try Past Year first
+            one_year_radio = filter_widget.get_by_role("radio", name="Past Year").first
+            if one_year_radio.is_visible(timeout=3000):
+                logger.info("Clicking Past Year radio...")
+                one_year_radio.click()
+                self.random_delay()
+
+                # Check results after 1 year filter
+                time_count = self._get_salary_result_count()
+                logger.info(f"After 1 Year filter: {time_count} results")
+
+                if time_count < MIN_RESULTS:
+                    logger.info(
+                        "Not enough results with 1 Year filter, trying 2 Years..."
+                    )
+
+                    # Try 2 years instead
+                    two_years_radio = filter_widget.get_by_role(
+                        "radio", name="Past 2 Years"
+                    ).first
+                    if two_years_radio.is_visible(timeout=3000):
+                        logger.info("Clicking Past 2 Years radio...")
+                        two_years_radio.click()
+                        self.random_delay()
+
+                        # Check results after 2 years filter
+                        time_count = self._get_salary_result_count()
+                        logger.info(f"After 2 Years filter: {time_count} results")
+                        if time_count < MIN_RESULTS:
+                            logger.info(
+                                "Not enough results after 2 Years filter, setting to All Time..."
+                            )
+                            # Reset to All Time if neither option works
+                            all_time_radio = filter_widget.get_by_role(
+                                "radio", name="All Time"
+                            ).first
+                            all_time_radio.click()
+                            self.random_delay()
+
         except Exception as e:
             logger.error(f"Failed to set filters: {e}")
             raise Exception("Could not set filters")
