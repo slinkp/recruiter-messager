@@ -418,18 +418,41 @@ class LevelsFyiSearcher:
                 if not filter_widget.is_visible(timeout=3000):
                     raise Exception("Filter menu did not open after clicking")
 
+            return filter_widget
+
         except Exception as e:
             logger.error(f"Failed to toggle filter menu: {e}")
             raise Exception("Could not toggle filter menu")
 
+    def _clear_location_filters(self, filter_widget):
+        logger.info("Clearing location filters...")
+        # First find the list containing United States within the filter widget
+        logger.info("Finding location filter list...")
+        location_list = filter_widget.locator(
+            "ul:has(label:has-text('United States'))"
+        ).first
+
+        # Then find and uncheck any selected locations within this list
+        logger.info("Unchecking any selected locations...")
+        location_checkboxes = location_list.locator("input[type='checkbox']").all()
+
+        for checkbox in location_checkboxes:
+            if checkbox.is_checked():
+                logger.info("Unchecking location checkbox")
+                checkbox.click()
+                self.random_delay(0.2, 0.6)
+
     def _narrow_salary_search(self):
         logger.info("Narrowing salary search...")
-        self._toggle_search_filters()
+        filter_widget = self._toggle_search_filters()
 
         try:
-            # 1. Click United States checkbox
+            self._clear_location_filters(filter_widget)
+            # Click United States checkbox
             logger.info("Looking for United States checkbox...")
-            us_checkbox = self.page.get_by_role("checkbox", name="United States").first
+            us_checkbox = filter_widget.get_by_role(
+                "checkbox", name="United States"
+            ).first
 
             if not us_checkbox.is_visible(timeout=3000):
                 raise Exception("United States checkbox not found")
@@ -476,7 +499,7 @@ def main():
             print(
                 f"{result['level']} {result['role']} ({result['experience']}): {result['total_comp']} - {result['location']}"
             )
-        time.sleep(10)
+        time.sleep(3)
 
     finally:
         searcher.cleanup()
