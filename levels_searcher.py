@@ -426,11 +426,29 @@ class LevelsFyiSearcher:
         logger.info("Narrowing salary search...")
         self._toggle_search_filters()
 
-        # Rest of filtering logic will go here...
+        try:
+            # 1. Click United States checkbox
+            logger.info("Looking for United States checkbox...")
+            us_checkbox = self.page.get_by_role("checkbox", name="United States").first
+
+            if not us_checkbox.is_visible(timeout=3000):
+                raise Exception("United States checkbox not found")
+
+            logger.info("Clicking United States checkbox...")
+            us_checkbox.click()
+            self.random_delay()
+
+            # Verify it was selected
+            if not us_checkbox.is_checked():
+                raise Exception("Failed to select United States checkbox")
+
+        except Exception as e:
+            logger.error(f"Failed to set United States filter: {e}")
+            raise Exception("Could not set location filter")
+
         # 0. need an algorithm to count results.
         # My approximate filtering algorithm: do these one at a time,
         # until there are too few, and then back up one step
-        # 1. location: click United States.
         # 2. years of experience: click Senior.
         # 3. experience: click New Offer Only.
         # 4. location: unclick US, click Greater NYC Area.
