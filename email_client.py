@@ -15,7 +15,13 @@ CREDENTIALS_FILE = os.path.join(AUTH_DIR, "credentials.json")
 TOKEN_FILE = os.path.join(AUTH_DIR, "token.json")
 
 
-class GmailSearcher:
+class GmailRepliesSearcher:
+    """
+    Searches for user's previous replies to recruiter emails.
+
+    Intended to be used to feed into a RAG system to help it understand the
+    user's communication style.
+    """
 
     SCOPES = (
         "https://www.googleapis.com/auth/gmail.readonly",
@@ -157,7 +163,7 @@ class GmailSearcher:
 
 
 if __name__ == "__main__":
-    searcher = GmailSearcher()
+    searcher = GmailRepliesSearcher()
     searcher.authenticate()
     query = "label:jobs-2024/recruiter-pings from:me"
     processed_messages = searcher.get_recruiter_replies(query, max_results=10)

@@ -2,7 +2,7 @@ import os.path
 import textwrap
 import json
 import logging
-from email_client import GmailSearcher
+import email_client
 from rag import RecruitmentRAG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +21,7 @@ def load_messages(use_cache: bool = True):
             print("No cache found, rebuilding...")
     if not processed_messages:
         print("Fetching messages from mail...")
-        searcher = GmailSearcher()
+        searcher = email_client.GmailRepliesSearcher()
         searcher.authenticate()
         query = "label:jobs-2024/recruiter-pings from:me"
         processed_messages = searcher.get_recruiter_replies(query, max_results=300)
