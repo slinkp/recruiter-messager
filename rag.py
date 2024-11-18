@@ -1,6 +1,6 @@
 import os
 from typing import List, Tuple
-
+import logging
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -11,6 +11,7 @@ from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
+logger = logging.getLogger(__name__)
 
 TEMPLATE = """You are an AI assistant helping to generate replies to recruiter messages
 based on previous interactions.
@@ -50,7 +51,8 @@ DATA_DIR = os.path.join(HERE, "data")
 
 
 class RecruitmentRAG:
-    def __init__(self, messages: List[Tuple[str, str, str]]):
+
+    def __init__(self, messages: List[Tuple[str, str, str]], loglevel=logging.INFO):
         if len(messages) == 0:
             raise ValueError("No messages provided")
         self.messages = messages
@@ -61,6 +63,7 @@ class RecruitmentRAG:
         self.vectorstore = None
         self.retriever = None
         self.chain = None
+        logger.setLevel(loglevel)
 
     def make_replies_vector_db(self, clear_existing: bool = False):
         collection_name = "recruiter-replies"
@@ -72,7 +75,7 @@ class RecruitmentRAG:
         # Only add the documents to the vectorstore if it's empty
         has_data = bool(vectorstore.get(limit=1, include=[])["ids"])
         if has_data and not clear_existing:
-            print(f"Loaded vector store for {collection_name}")
+            logger.info(f"Loaded vector store for {collection_name}")
             return vectorstore
 
         if clear_existing:
@@ -83,7 +86,7 @@ class RecruitmentRAG:
             text = f"Subject: {subject}\nRecruiter: {recruiter_message}\nMy Reply: {my_reply}"
             documents.append(Document(page_content=text))
 
-        print(f"Adding initial documents to the vector store from split data")
+        logger.info("Adding initial documents to the vector store from split data")
 
         split_docs = self.text_splitter.split_documents(documents)
         vectorstore.add_documents(split_docs)

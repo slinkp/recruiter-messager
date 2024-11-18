@@ -1,6 +1,7 @@
 import os.path
 import textwrap
 import json
+import logging
 from email_client import GmailSearcher
 from rag import RecruitmentRAG
 
@@ -31,11 +32,11 @@ def load_messages(use_cache: bool = True):
     return processed_messages
 
 
-def main(model: str, limit: int, use_cache: bool = True):
+def main(model: str, limit: int, use_cache: bool = True, loglevel: int = logging.INFO):
     processed_messages = load_messages(use_cache)
 
     # Set up the RAG pipeline
-    rag = RecruitmentRAG(processed_messages)
+    rag = RecruitmentRAG(processed_messages, loglevel=loglevel)
     rag.prepare_data(clear_existing=not use_cache)
     rag.setup_chain(llm_type=model)
     print(f"RAG setup complete")
@@ -79,5 +80,22 @@ if __name__ == "__main__":
         default=False,
         help="Do not use cached messages from Gmail",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="Print verbose logging",
+    )
     args = parser.parse_args()
-    main(args.model, limit=args.limit, use_cache=not args.no_cache)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    main(
+        args.model,
+        limit=args.limit,
+        use_cache=not args.no_cache,
+        loglevel=logging.DEBUG,
+    )
