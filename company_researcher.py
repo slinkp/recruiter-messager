@@ -93,6 +93,7 @@ class CompanyInfo(BaseModel):
         return v
 
 
+# TODO: Replace this implementation with something more like TavilyResearchAgent
 class Researcher:
 
     def __init__(self, url, model, refresh_rag_db: bool = False):
