@@ -7,7 +7,6 @@ from rag import RecruitmentRAG
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-
 def load_messages(use_cache: bool = True):
 
     cachefile = os.path.join(HERE, "processed_messages.json")
@@ -23,8 +22,9 @@ def load_messages(use_cache: bool = True):
         print("Fetching messages from mail...")
         searcher = email_client.GmailRepliesSearcher()
         searcher.authenticate()
-        query = "label:jobs-2024/recruiter-pings from:me"
-        processed_messages = searcher.get_recruiter_replies(query, max_results=300)
+        processed_messages = searcher.get_recruiter_replies(
+            query=email_client.RECRUITER_REPLIES_QUERY, max_results=300
+        )
         print(f"Got messages from mail: {len(processed_messages)}")
         with open(cachefile, "w") as f:
             json.dump(processed_messages, f, indent=2)

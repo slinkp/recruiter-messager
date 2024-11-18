@@ -15,6 +15,8 @@ CREDENTIALS_FILE = os.path.join(AUTH_DIR, "credentials.json")
 TOKEN_FILE = os.path.join(AUTH_DIR, "token.json")
 
 
+RECRUITER_REPLIES_QUERY = "label:jobs-2024/recruiter-pings-archived from:me"
+
 class GmailRepliesSearcher:
     """
     Searches for user's previous replies to recruiter emails.
@@ -165,7 +167,7 @@ class GmailRepliesSearcher:
 if __name__ == "__main__":
     searcher = GmailRepliesSearcher()
     searcher.authenticate()
-    query = "label:jobs-2024/recruiter-pings from:me"
+    query = RECRUITER_REPLIES_QUERY
     processed_messages = searcher.get_recruiter_replies(query, max_results=10)
     processed_messages = processed_messages[:3]
     import textwrap
