@@ -1,8 +1,9 @@
 import company_researcher
-import rag
+from rag import RecruitmentRAG
 import email_client
 import logging
 import argparse
+import fake_recruiter_rag_demo
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,31 @@ def archive_message(msg: str):
     pass
 
 
-def main():
-    # Build RAG context from recruiter replies
-    processed_messages = email_client.get_recruiter_replies()
-    recruiter_rag = rag.RecruitmentRAG(processed_messages)
+def build_reply_rag(
+    model: str, limit: int, use_cache: bool = True, loglevel: int = logging.INFO
+):
+    processed_messages = fake_recruiter_rag_demo.load_messages(use_cache)
+
+    # Set up the RAG pipeline
+    rag = RecruitmentRAG(processed_messages, loglevel=loglevel)
+    rag.prepare_data(clear_existing=not use_cache)
+    rag.setup_chain(llm_type=model)
+    print(f"RAG setup complete")
+    return rag
+
+
+def main(
+    reply_rag_model: str,
+    reply_rag_limit: int,
+    use_cache: bool = True,
+    loglevel: int = logging.INFO,
+):
+    recruiter_rag = build_reply_rag(
+        model=reply_rag_model,
+        limit=reply_rag_limit,
+        use_cache=use_cache,
+        loglevel=loglevel,
+    )
 
     # TODO: Read new recruiter email from gmail.
     # The email_client code doesn't have this yet.
@@ -79,6 +101,28 @@ if __name__ == "__main__":
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Print verbose logging"
     )
+    parser.add_argument(
+        "--model", action="store", choices=["openai", "claude"], default="openai"
+    )
+    parser.add_argument(
+        "--limit",
+        action="store",
+        type=int,
+        default=10,
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        default=False,
+        help="Do not use cached messages from Gmail",
+    )
+
     args = parser.parse_args()
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
-    main()
+    loglevel = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=loglevel)
+    main(
+        reply_rag_model=args.model,
+        reply_rag_limit=args.limit,
+        use_cache=not args.no_cache,
+        loglevel=loglevel,
+    )
