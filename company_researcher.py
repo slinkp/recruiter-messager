@@ -71,17 +71,25 @@ class CompanyInfo(BaseModel):
         "extra": "forbid",
     }
 
-    company: Optional[str] = Field(description="The name of the company")
+    company: Optional[str] = Field(default=None, description="The name of the company")
     funding_status: Optional[
         Literal["public", "private", "unicorn", "private finance"]
-    ] = Field(description="The funding status of the company")
-    mission: Optional[str] = Field(description="The mission of the company")
-    work_policy: Optional[Literal["remote", "hybrid", "onsite"]] = Field(
-        description="The work policy of the company"
+    ] = Field(default=None, description="The funding status of the company")
+    mission: Optional[str] = Field(
+        default=None, description="The mission of the company"
     )
-    total_employees: Optional[int] = Field(description="The total number of employees")
-    total_engineers: Optional[int] = Field(description="The total number of engineers")
-    nyc_employees: Optional[int] = Field(description="The number of employees in NYC")
+    work_policy: Optional[Literal["remote", "hybrid", "onsite"]] = Field(
+        default=None, description="The work policy of the company"
+    )
+    total_employees: Optional[int] = Field(
+        default=None, description="The total number of employees"
+    )
+    total_engineers: Optional[int] = Field(
+        default=None, description="The total number of engineers"
+    )
+    nyc_employees: Optional[int] = Field(
+        default=None, description="The number of employees in NYC"
+    )
 
     @field_validator("*", mode="before")
     @classmethod

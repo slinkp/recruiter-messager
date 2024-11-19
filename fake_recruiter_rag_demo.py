@@ -22,7 +22,7 @@ def load_messages(use_cache: bool = True):
         print("Fetching messages from mail...")
         searcher = email_client.GmailRepliesSearcher()
         searcher.authenticate()
-        processed_messages = searcher.get_recruiter_replies(
+        processed_messages = searcher.get_my_replies_to_recruiters(
             query=email_client.RECRUITER_REPLIES_QUERY, max_results=300
         )
         print(f"Got messages from mail: {len(processed_messages)}")

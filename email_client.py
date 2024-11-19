@@ -141,8 +141,8 @@ class GmailRepliesSearcher:
                 return header["value"]
         return "No Subject"
 
-    def get_recruiter_replies(
-        self, query: str, max_results: int = 10
+    def get_my_replies_to_recruiters(
+        self, query: str = RECRUITER_REPLIES_QUERY, max_results: int = 10
     ) -> List[Tuple[str, str, str]]:
         results = self.search_and_get_details(query, max_results)
         print(f"Got {len(results)} messages")
@@ -163,12 +163,19 @@ class GmailRepliesSearcher:
         processed_messages.sort(reverse=True)
         return [msg for _, msg in processed_messages]
 
+    def get_new_recruiter_messages(self, max_results: int = 10):
+        """
+        Get new messages from recruiters that we haven't replied to yet.
+        """
+        # TODO: Implement this
+        return []
+
 
 if __name__ == "__main__":
     searcher = GmailRepliesSearcher()
     searcher.authenticate()
     query = RECRUITER_REPLIES_QUERY
-    processed_messages = searcher.get_recruiter_replies(query, max_results=10)
+    processed_messages = searcher.get_my_replies_to_recruiters(query, max_results=10)
     processed_messages = processed_messages[:3]
     import textwrap
 
