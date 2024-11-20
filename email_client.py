@@ -17,6 +17,7 @@ TOKEN_FILE = os.path.join(AUTH_DIR, "token.json")
 
 
 RECRUITER_REPLIES_QUERY = "label:jobs-2024/recruiter-pings-archived from:me"
+RECRUITER_MESSAGES_QUERY = "label:jobs-2024/recruiter-pings"
 
 
 logger = logging.getLogger(__name__)
@@ -170,8 +171,10 @@ class GmailRepliesSearcher:
         """
         Get new messages from recruiters that we haven't replied to yet.
         """
-        # TODO: Implement this
-        return []
+        logger.info(f"Getting {max_results} new recruiter messages...")
+        results = self.search_and_get_details(RECRUITER_MESSAGES_QUERY, max_results)
+        logger.info(f"...Got {len(results)} raw recruiter messages")
+        return results
 
 
 if __name__ == "__main__":
