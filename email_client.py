@@ -111,6 +111,7 @@ class GmailRepliesSearcher:
             "See all connections in common",
             "View profile:",
             "Accept:http",
+            "-------------------------------",
         )
         for garbage in linkedin_garbage_lines:
             if line.startswith(garbage):
