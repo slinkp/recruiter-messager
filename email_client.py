@@ -1,6 +1,7 @@
 import base64
 import os
 import re
+import logging
 from typing import List, Tuple
 
 from google.oauth2.credentials import Credentials
@@ -17,6 +18,8 @@ TOKEN_FILE = os.path.join(AUTH_DIR, "token.json")
 
 RECRUITER_REPLIES_QUERY = "label:jobs-2024/recruiter-pings-archived from:me"
 
+
+logger = logging.getLogger(__name__)
 class GmailRepliesSearcher:
     """
     Searches for user's previous replies to recruiter emails.
@@ -88,8 +91,8 @@ class GmailRepliesSearcher:
                         data = part["body"]["data"]
                         return base64.urlsafe_b64decode(data).decode()
 
-            # If no suitable content is found, return an error message
-            return "Unable to extract message content"
+        logger.error("No content found in message")
+        return ""
 
     def clean_reply(self, text):
         text = text.strip()
