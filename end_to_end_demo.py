@@ -106,7 +106,7 @@ class EmailResponder:
         return self.rag.generate_reply(msg)
 
     def get_new_recruiter_messages(
-        self, max_results: int = 500
+        self, max_results: int = 100
     ) -> list[tuple[str, str, str]]:
         messsage_dicts = self.email_client.get_new_recruiter_messages(
             max_results=max_results
@@ -135,9 +135,6 @@ class EmailResponder:
             if len(combined_content) > 1:
                 for i, content in enumerate(combined_content):
                     logger.debug(f"Thread {thread_id} content {i}:\n{content[:200]}...")
-            else:
-                # HACK: For test purposes i'm only interested in combined messages
-                continue
 
             combined_msg["combined_content"] = "\n\n".join(combined_content)
             combined_messages.append(combined_msg)
@@ -164,11 +161,17 @@ def main(args, loglevel: int = logging.INFO):
         # TODO: These are just raw strings. Fake some dicts for them.
         new_recruiter_email = args.test_messages
     else:
-        new_recruiter_email = email_responder.get_new_recruiter_messages()
+        new_recruiter_email = email_responder.get_new_recruiter_messages(
+            max_results=args.limit
+        )
 
     for msg in new_recruiter_email:
         # Log the subject
-        content = msg.get("combined_content")
+        content = msg.get("combined_content").strip()
+        if not content:
+            logger.warning("Empty message, skipping")
+            continue
+
         logger.info(
             f"==============================\n\nProcessing message:\n\n{content}\n"
         )
