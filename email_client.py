@@ -108,6 +108,9 @@ class GmailRepliesSearcher:
             "Get the new LinkedIn",
             "Also available on mobile",
             "*Tip:* You can respond to ",
+            "See all connections in common",
+            "View profile:",
+            "Accept:http",
         )
         for garbage in linkedin_garbage_lines:
             if line.startswith(garbage):
