@@ -215,13 +215,11 @@ def main(args, loglevel: int = logging.INFO):
         use_cache=not args.no_cache,
         loglevel=loglevel,
     )
-    # TODO: Read new recruiter email from gmail.
-    # The email_client code doesn't have this yet.
-    # It should combine multiple emails from the same recruiter.
 
     if args.test_messages:
-        # TODO: These are just raw strings. Fake some dicts for them.
-        new_recruiter_email = args.test_messages
+        new_recruiter_email = [
+            {"combined_content": msg, "internalDate": "0"} for msg in args.test_messages
+        ]
     else:
         new_recruiter_email = email_responder.get_new_recruiter_messages(
             max_results=args.limit
