@@ -7,12 +7,68 @@ import logging
 import argparse
 import json
 import functools
+from diskcache import Cache
+from functools import wraps
+from enum import Enum, auto
 
 logger = logging.getLogger(__name__)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+cache = Cache(os.path.join(HERE, ".cache"))
 
+
+class CacheStep(Enum):
+    RAG_CONTEXT = auto()
+    GET_MESSAGES = auto()
+    BASIC_RESEARCH = auto()
+    FOLLOWUP_RESEARCH = auto()
+    REPLY = auto()
+
+    def includes(self, other: "CacheStep") -> bool:
+        return other.value <= self.value
+
+
+def disk_cache(step: CacheStep):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, use_cache=True, clear_cache=False, **kwargs):
+            if not use_cache:
+                return func(*args, **kwargs)
+
+            key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+
+            if clear_cache:
+                cache.delete(key)
+
+            result = cache.get(key)
+            if result is None:
+                result = func(*args, **kwargs)
+                cache.set(key, result)
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def should_cache_step(args, step: CacheStep) -> bool:
+    if args.no_cache:
+        return False
+    if args.cache_until is None:
+        return True
+    return args.cache_until.includes(step)
+
+
+def should_clear_cache(args, step: CacheStep) -> bool:
+    if args.clear_all_cache:
+        return True
+    if not args.clear_cache:
+        return False
+    return step in args.clear_cache
+
+
+@disk_cache(CacheStep.BASIC_RESEARCH)
 def initial_research_company(message: str) -> company_researcher.CompanyInfo:
     # TODO: Implement this:
     # - Enhance company_researcher.py to work with a blob of data (not just a company name)
@@ -27,6 +83,7 @@ def initial_research_company(message: str) -> company_researcher.CompanyInfo:
     return company_researcher.CompanyInfo()
 
 
+@disk_cache(CacheStep.FOLLOWUP_RESEARCH)
 def followup_research_company(company_info: company_researcher.CompanyInfo):
     # TODO: Implement this:
     # - use linkedin_searcher.py to find contacts
@@ -146,6 +203,11 @@ class EmailResponder:
         return combined_messages
 
 
+def update_spreadsheet(company_info: company_researcher.CompanyInfo):
+    # TODO: Implement this
+    pass
+
+
 def main(args, loglevel: int = logging.INFO):
     email_responder = EmailResponder(
         reply_rag_model=args.model,
@@ -176,7 +238,7 @@ def main(args, loglevel: int = logging.INFO):
             f"==============================\n\nProcessing message:\n\n{content}\n"
         )
         # TODO: pass subject too?
-        company_info = initial_research_company(content)
+        company_info = initial_research_company(content, use_cache=not args.no_cache)
         logger.info(f"Company info: {company_info}\n\n")
         reply = email_responder.generate_reply(content)
         logger.info(f"------ GENERATED REPLY:\n{reply}\n\n")
@@ -186,6 +248,7 @@ def main(args, loglevel: int = logging.INFO):
         reply = maybe_edit_reply(reply)
         send_reply(reply)
         archive_message(msg)
+        update_spreadsheet(company_info)
 
 
 if __name__ == "__main__":
@@ -206,7 +269,28 @@ if __name__ == "__main__":
         "--no-cache",
         action="store_true",
         default=False,
-        help="Do not use cached messages from Gmail",
+        help="Do not use any caching",
+    )
+
+    parser.add_argument(
+        "--cache-until",
+        type=lambda s: CacheStep[s.upper()],
+        choices=list(CacheStep),
+        help="Cache steps up to and including this step (RAG_CONTEXT, GET_MESSAGES, RESEARCH, FOLLOWUP, REPLY)",
+    )
+
+    # Clear cache options
+    parser.add_argument(
+        "--clear-all-cache",
+        action="store_true",
+        help="Clear all cached data before running",
+    )
+    parser.add_argument(
+        "--clear-cache",
+        type=lambda s: CacheStep[s.upper()],
+        choices=list(CacheStep),
+        nargs="+",
+        help="Clear cache for specific steps before running",
     )
 
     parser.add_argument(
@@ -217,4 +301,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     loglevel = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=loglevel)
+
+    # Clear all cache if requested (do this before any other operations)
+    if args.clear_all_cache:
+        logger.info("Clearing all cache...")
+        cache.clear()
+
     main(args, loglevel=loglevel)
