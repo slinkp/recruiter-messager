@@ -333,40 +333,43 @@ For the company at {company_url}, find:
  - Number of employees at NYC office, if any.
  - Number of employees who are egineers.
 """
-# - the URLs of the pages that contain the information above
-# """
 
-FUNDING_STATUS_PROMPT = """
- - the company's latest valuation, in millions of dollars, if known.
- - the company's public/private status.  If private and valued at over $1B, call it a "unicorn".
- - the most recent funding round (eg "Series A", "Series B", etc.) if private.
-"""
 BASIC_COMPANY_FORMAT_PROMPT = """
 Return these results as a valid JSON object, with the following keys and data types:
- - headcount: integer or null
- - headcount_nyc: integer or null
- - headcount_engineers: integer or null
- - valuation: integer or null
- - public_status: string "public", "private", "private unicorn" or null
- - funding_series: string or null
  - headquarters_city: string or null
  - nyc_office_address: string or null
- - citation_urls: list of strings
+ - total_employees: integer or null
+ - nyc_employees: integer or null
+ - total_engineers: integer or null
 
 The value of nyc_office_address, if known, must be returned as a valid US mailing address with a street address, 
 city, state, and zip code.
 The value of headquarters_city must be the city, state/province, and country of the company's headquarters, if known.
 """
+# - the URLs of the pages that contain the information above
+# """
+
+FUNDING_STATUS_PROMPT = """
+For the company at {company_url}, find:
+ - The company's public/private status.  If there is a stock symbol, it's public.
+   If private and valued at over $1B, call it a "unicorn".
+ - The company's latest valuation, in millions of dollars, if known.
+ - The most recent funding round (eg "Series A", "Series B", etc.) if private.
+"""
+
+FUNDING_STATUS_FORMAT_PROMPT = """
+Return these results as a valid JSON object, with the following keys and data types:
+ - public_status: string "public", "private", "private unicorn" or null
+ - valuation: integer or null
+ - funding_series: string or null
+ """
 
 EMPLOYMENT_PROMPT = """
 For the company at {company_url}, find:
     - the company's remote work policy
     - whether the company is currently hiring backend engineers
     - whether the company is hiring backend engineers with AI experience
-    - whether engineers are expected to do a systems design interview
-    - whether engineers are expected to do a leetcode style coding interview
     - the URL of the company's primary jobs page, preferably on their own website, if known.
-    - the URLs of the pages that contain the information above
 """
 
 EMPLOYMENT_FORMAT_PROMPT = """
@@ -374,9 +377,20 @@ Return these results as a valid JSON object, with the following keys and data ty
     - remote_work_policy: string "hybrid", "remote", "in-person", or null
     - hiring_status: boolean or null
     - hiring_status_ai: boolean or null
+    - jobs_homepage_url: string or null
+    - citation_urls: list of strings
+"""
+
+INTERVIEW_STYLE_PROMPT = """
+For the company at {company_url}, find:
+    - whether engineers are expected to do a systems design interview
+    - whether engineers are expected to do a leetcode style coding interview
+"""
+
+INTERVIEW_STYLE_FORMAT_PROMPT = """
+Return these results as a valid JSON object, with the following keys and data types:
     - interview_style_systems: boolean or null
     - interview_style_leetcode: boolean or null
-    - jobs_homepage_url: string or null
     - citation_urls: list of strings
 """
 
@@ -399,17 +413,22 @@ of how AI is used by the company, or null if the company does not use AI.
 
 COMPANY_PROMPTS = [
     BASIC_COMPANY_PROMPT,
+    FUNDING_STATUS_PROMPT,
+    INTERVIEW_STYLE_PROMPT,
     EMPLOYMENT_PROMPT,
     AI_MISSION_PROMPT,
 ]
 
 COMPANY_PROMPTS_WITH_FORMAT_PROMPT = [
     (BASIC_COMPANY_PROMPT, BASIC_COMPANY_FORMAT_PROMPT),
+    (FUNDING_STATUS_PROMPT, FUNDING_STATUS_FORMAT_PROMPT),
+    (INTERVIEW_STYLE_PROMPT, INTERVIEW_STYLE_FORMAT_PROMPT),
     (EMPLOYMENT_PROMPT, EMPLOYMENT_FORMAT_PROMPT),
     (AI_MISSION_PROMPT, AI_MISSION_FORMAT_PROMPT),
 ]
 
-class TavilyResearchAgent:
+
+class TavilyRAGResearchAgent:
 
     def __init__(self, verbose: bool = False):
 
@@ -426,10 +445,6 @@ class TavilyResearchAgent:
             self.llm, [self.tavily_tool], verbose=verbose
         )
         self.verbose = verbose
-
-    def single_search(self, query: str):
-        result = self.agent_chain.invoke(query)
-        return result["output"]
 
     def make_prompt(
         self, search_prompt: str, format_prompt: str, extra_context: str = "", **kwargs
@@ -457,26 +472,14 @@ class TavilyResearchAgent:
         )
 
         return "\n".join(parts)
-
-    def main(self, url: str):
-        data = {}
-        for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
-            prompt = self.make_prompt(prompt, format_prompt, company_url=url)
-            result = self.single_search(prompt)
-            data.update(result)
-        return data
-
-
-class TavilyRAGResearchAgent(TavilyResearchAgent):
-
     def main(self, url: str) -> dict:
 
         tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 
-        data = {}
+        data = {"citation_urls": []}
         for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
             prompt = prompt.format(company_url=url)
-            if len(prompt) > GET_SEARCH_CONTEXT_LIMIT:
+            if len(prompt) > GET_SEARCH_CONTEXT_INPUT_LIMIT:
                 logger.warning(
                     f"Truncating prompt from {len(prompt)} to {GET_SEARCH_CONTEXT_INPUT_LIMIT} characters"
                 )
@@ -492,8 +495,11 @@ class TavilyRAGResearchAgent(TavilyResearchAgent):
             full_prompt = self.make_prompt(prompt, format_prompt, extra_context=context)
             logger.debug(f"  Full prompt:\n\n {full_prompt}\n\n")
             result = self.llm.invoke(full_prompt)
-            data.update(result)
-            break
+            content = json.loads(result.content)
+            citation_urls = content.pop("citation_urls", [])
+            data.update(content)
+            data["citation_urls"].extend(citation_urls)
+            logger.info(f"  DATA SO FAR:\n{json.dumps(data, indent=2)}\n\n")
         return data
 
 
