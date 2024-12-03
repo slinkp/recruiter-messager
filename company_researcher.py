@@ -57,6 +57,8 @@ from langchain.agents.agent_toolkits import create_conversational_retrieval_agen
 from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search.tool import TavilySearchResults
 
+from tavily import TavilyClient
+
 from langchain_community.cache import SQLiteCache
 from langchain_core.globals import set_llm_cache
 
@@ -318,28 +320,38 @@ class BasicRagResearchAgent:
         return self.data
 
 
+# Tavily API has undocumented input limit of 400 for get_search_context(query)
+# HACK: We have to be very careful to keep prompts under this limit.
+GET_SEARCH_CONTEXT_INPUT_LIMIT = 400
+
+# PROMPT_LIMIT
 BASIC_COMPANY_PROMPT = """
 For the company at {company_url}, find:
-   - the total number of employees worldwide 
-   - the number of employees at the NYC office, if there is one.
-   - the number of employees who are egineers, if known.
-   - the company's latest valuation, in millions of dollars, if known.
-   - the company's public/private status.  If private and valued at over $1B, call it a "unicorn".
-   - the most recent funding round (eg "Series A", "Series B", etc.) if private.
-   - the city and country of the company's headquarters
-   - the address of the company's NYC office, if there is one
-   - the URLs of the pages that contain the information above
+ - City and country of the company's headquarters.
+ - Address of the company's NYC office, if there is one.
+ - Total number of employees worldwide. 
+ - Number of employees at NYC office, if any.
+ - Number of employees who are egineers.
+"""
+# - the URLs of the pages that contain the information above
+# """
 
+FUNDING_STATUS_PROMPT = """
+ - the company's latest valuation, in millions of dollars, if known.
+ - the company's public/private status.  If private and valued at over $1B, call it a "unicorn".
+ - the most recent funding round (eg "Series A", "Series B", etc.) if private.
+"""
+BASIC_COMPANY_FORMAT_PROMPT = """
 Return these results as a valid JSON object, with the following keys and data types:
-    - headcount: integer or null
-    - headcount_nyc: integer or null
-    - headcount_engineers: integer or null
-    - valuation: integer or null
-    - public_status: string "public", "private", "private unicorn" or null
-    - funding_series: string or null
-    - headquarters_city: string or null
-    - nyc_office_address: string or null
-    - citation_urls: list of strings
+ - headcount: integer or null
+ - headcount_nyc: integer or null
+ - headcount_engineers: integer or null
+ - valuation: integer or null
+ - public_status: string "public", "private", "private unicorn" or null
+ - funding_series: string or null
+ - headquarters_city: string or null
+ - nyc_office_address: string or null
+ - citation_urls: list of strings
 
 The value of nyc_office_address, if known, must be returned as a valid US mailing address with a street address, 
 city, state, and zip code.
@@ -355,7 +367,9 @@ For the company at {company_url}, find:
     - whether engineers are expected to do a leetcode style coding interview
     - the URL of the company's primary jobs page, preferably on their own website, if known.
     - the URLs of the pages that contain the information above
+"""
 
+EMPLOYMENT_FORMAT_PROMPT = """
 Return these results as a valid JSON object, with the following keys and data types:
     - remote_work_policy: string "hybrid", "remote", "in-person", or null
     - hiring_status: boolean or null
@@ -371,7 +385,9 @@ Is the company at {company_url} a company that uses AI?
 Look for blog posts, press releases, news articles, etc. about whether and how AI 
 is used for the company's products or services, whether as public-facing features or
 internal implementation. Another good clue is whether the company is hiring AI engineers.
+"""
 
+AI_MISSION_FORMAT_PROMPT = """
 Return the result as a valid JSON object with the following keys and data types:
   - uses_ai: boolean or null
   - ai_notes: string or null
@@ -381,6 +397,17 @@ ai_notes should be a short summary (no more than 100 words)
 of how AI is used by the company, or null if the company does not use AI.
 """
 
+COMPANY_PROMPTS = [
+    BASIC_COMPANY_PROMPT,
+    EMPLOYMENT_PROMPT,
+    AI_MISSION_PROMPT,
+]
+
+COMPANY_PROMPTS_WITH_FORMAT_PROMPT = [
+    (BASIC_COMPANY_PROMPT, BASIC_COMPANY_FORMAT_PROMPT),
+    (EMPLOYMENT_PROMPT, EMPLOYMENT_FORMAT_PROMPT),
+    (AI_MISSION_PROMPT, AI_MISSION_FORMAT_PROMPT),
+]
 
 class TavilyResearchAgent:
 
@@ -398,44 +425,80 @@ class TavilyResearchAgent:
         self.agent_chain = create_conversational_retrieval_agent(
             self.llm, [self.tavily_tool], verbose=verbose
         )
+        self.verbose = verbose
 
     def single_search(self, query: str):
         result = self.agent_chain.invoke(query)
         return result["output"]
 
-    def make_prompt(self, prompt: str, **kwargs):
-        prompt = prompt.format(**kwargs)
-        return "\n".join(
+    def make_prompt(
+        self, search_prompt: str, format_prompt: str, extra_context: str = "", **kwargs
+    ):
+        prompt = search_prompt.format(**kwargs)
+        parts = [
+            "You are a helpful research agent researching companies.",
+            "You may use any context you have gathered in previous queries to answer the current question.",
+            prompt,
+        ]
+
+        if extra_context:
+            parts.append("Use this additional JSON context to answer the question:")
+            parts.append(extra_context)
+
+        parts.extend(
             [
-                "You are a helpful research agent researching companies.",
-                "You may use any context you have gathered in previous queries to answer the current question.",
-                prompt,
-                "",
-                "You must always output a valid JSON object with exactly the keys specified in the prompt.",
+                "You must always output a valid JSON object with exactly the keys specified.",
                 "citation_urls should always be a list of strings of URLs that contain the information above.",
                 "If any string json value other than a citation url is longer than 80 characters, write a shorter summary of the value",
                 "unless otherwise clearly specified in the prompt.",
                 "Return ONLY the valid JSON object, nothing else.",
+                format_prompt,
             ]
         )
 
-    COMPANY_PROMPTS = [
-        BASIC_COMPANY_PROMPT,
-        EMPLOYMENT_PROMPT,
-        AI_MISSION_PROMPT,
-    ]
+        return "\n".join(parts)
 
     def main(self, url: str):
         data = {}
-        for prompt in self.COMPANY_PROMPTS:
-            prompt = self.make_prompt(prompt, company_url=url)
+        for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
+            prompt = self.make_prompt(prompt, format_prompt, company_url=url)
             result = self.single_search(prompt)
             data.update(result)
         return data
 
 
+class TavilyRAGResearchAgent(TavilyResearchAgent):
+
+    def main(self, url: str) -> dict:
+
+        tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+
+        data = {}
+        for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
+            prompt = prompt.format(company_url=url)
+            if len(prompt) > GET_SEARCH_CONTEXT_LIMIT:
+                logger.warning(
+                    f"Truncating prompt from {len(prompt)} to {GET_SEARCH_CONTEXT_INPUT_LIMIT} characters"
+                )
+                prompt = prompt[:GET_SEARCH_CONTEXT_INPUT_LIMIT]
+                logger.debug(f"Prompt truncated: {prompt}")
+            else:
+                logger.debug(f"Prompt not truncated: {prompt}")
+
+            context = tavily_client.get_search_context(
+                query=prompt, max_tokens=1000 * 10
+            )
+            logger.debug(f"  Got Context: {len(context)}")
+            full_prompt = self.make_prompt(prompt, format_prompt, extra_context=context)
+            logger.debug(f"  Full prompt:\n\n {full_prompt}\n\n")
+            result = self.llm.invoke(full_prompt)
+            data.update(result)
+            break
+        return data
+
+
 def main(url, model, refresh_rag_db: bool = False, verbose: bool = False):
-    researcher = TavilyResearchAgent(verbose=verbose)
+    researcher = TavilyRAGResearchAgent(verbose=verbose)
     return researcher.main(url)
 
 
@@ -470,7 +533,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.verbose:
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.DEBUG)
     data = main(
         args.url,
         model=args.model,
