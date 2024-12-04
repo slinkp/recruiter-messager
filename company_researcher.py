@@ -238,7 +238,10 @@ class TavilyRAGResearchAgent:
                 logger.debug(f"Prompt not truncated: {prompt}")
 
             context = tavily_client.get_search_context(
-                query=prompt, max_tokens=1000 * 10
+                query=prompt,
+                max_tokens=1000 * 20,
+                max_results=10,
+                search_depth="advanced",
             )
             logger.debug(f"  Got Context: {len(context)}")
             full_prompt = self.make_prompt(prompt, format_prompt, extra_context=context)
