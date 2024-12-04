@@ -7,13 +7,11 @@ import csv
 import datetime
 import decimal
 import functools
-import glob
 import logging
 import os
 import os.path
-import re
 import sys
-from typing import Any, ClassVar, Generator, Iterator, Optional, Union
+from typing import Any, ClassVar, Generator, Iterator, Optional
 
 # Third-party imports
 from google.auth.exceptions import RefreshError
@@ -25,8 +23,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 
 # Constants
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-CHECKING = "checking"
-SAVINGS = "savings"
+
 FIRST_DATA_ROW = 2  # 0-indexed
 
 # Possible enhancements/ TODOs:
@@ -68,19 +65,8 @@ from googleapiclient.discovery import build
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-CHECKING = "checking"
-SAVINGS = "savings"
-
 
 FIRST_DATA_ROW = 2  # 0-indexed
-
-
-class SofiInputColumns:
-    date = 0
-    descr = 1
-    type = 2
-    amount = 3
-    balance = 4
 
 
 class BaseSheetRow(BaseModel):
@@ -112,6 +98,14 @@ class BaseSheetRow(BaseModel):
                     except (ValueError, ValidationError):
                         # TODO: only do this if optional
                         data[field_name] = None
+                elif "bool" in str(field.annotation) and isinstance(val, str):
+                    data[field_name] = (
+                        val.strip().strip().lower() == "yes" if val else None
+                    )
+                elif "int" in str(field.annotation) and isinstance(val, str):
+                    val = val.strip().replace(",", "")
+                    val = val.split(".")[0]
+                    data[field_name] = int(val) if val else None
                 elif "Decimal" in str(field.annotation) and isinstance(val, str):
                     try:
                         data[field_name] = Decimal(val)
@@ -192,28 +186,48 @@ class BaseSheetRow(BaseModel):
 
 
 class CompaniesSheetRow(BaseSheetRow):
-    what: str = Field(default="")
-    date: Optional[datetime.date] = Field(default=None)
-    checking_amt: Optional[decimal.Decimal] = Field(default=None)
-    savings_amt: Optional[decimal.Decimal] = Field(default=None)
-    raisin_amt: Optional[decimal.Decimal] = Field(default=None)
+    # Order determines index of column in sheet!
+    # Name	Type	RC?		current state	Updated	Started	Latest step	Next step	Next step date	Latest contact	End date			Total	Base	RSU	Bonus	Vesting		Leetcode?	Sys design?	notes	Remote / hybrid / onsite?	NY eng size	Total size	Headquarters	NY where	Commute home	Commute Lynn	Notes
+    name: Optional[str] = Field(default="")
+    type: Optional[str] = Field(default=None)
+    rc: Optional[bool] = Field(default=None)
+    url: Optional[str] = Field(default=None)
 
-    checking_bal: Optional[decimal.Decimal] = Field(default=None)
-    savings_bal: Optional[decimal.Decimal] = Field(default=None)
-    raisin_bal: Optional[decimal.Decimal] = Field(default=None)
-    total_bal: Optional[decimal.Decimal] = Field(default=None)
+    current_state: Optional[str] = Field(default=None)  # TODO validate values
+    updated: Optional[datetime.date] = Field(default=None)
 
-    repeat: str = Field(default="")
-    notes: str = Field(default="")
-    cleared: str = Field(default="")
-    deductible: str = Field(default="")
+    started: Optional[datetime.date] = Field(default=None)
+    latest_step: Optional[str] = Field(default=None)
+    next_step: Optional[str] = Field(default=None)
+    next_step_date: Optional[datetime.date] = Field(default=None)
+    latest_contact: Optional[datetime.date] = Field(default=None)
 
-    bank_checking_bal: Optional[decimal.Decimal] = Field(default=None)
-    bank_savings_bal: Optional[decimal.Decimal] = Field(default=None)
-    raisin_calc_bal: Optional[decimal.Decimal] = Field(default=None)
+    end_date: Optional[datetime.date] = Field(default=None)
 
-    balance_matches: str = Field(default="")
-    checksum: str = Field(default="")
+    referral: Optional[bool] = Field(default=None)
+    recruit_contact: Optional[str] = Field(default=None)
+
+    total_comp: Optional[decimal.Decimal] = Field(default=None)
+    base: Optional[decimal.Decimal] = Field(default=None)
+    rsu: Optional[decimal.Decimal] = Field(default=None)
+    bonus: Optional[decimal.Decimal] = Field(default=None)
+    vesting: Optional[str] = Field(default=None)
+    level_equiv: Optional[str] = Field(default=None)
+
+    leetcode: Optional[bool] = Field(default=None)
+    sys_design: Optional[bool] = Field(default=None)
+
+    ai_notes: Optional[str] = Field(default=None)
+
+    remote_policy: Optional[str] = Field(default=None)  # TODO validate values
+    eng_size: Optional[int] = Field(default=None)
+    total_size: Optional[int] = Field(default=None)
+    headquarters: Optional[str] = Field(default=None)
+    ny_address: Optional[str] = Field(default=None)
+    commute_home: Optional[str] = Field(default=None)
+    commute_lynn: Optional[str] = Field(default=None)
+
+    notes: Optional[str] = Field(default=None)
 
     @model_validator(mode="before")
     @classmethod
@@ -229,14 +243,8 @@ class CompaniesSheetRow(BaseSheetRow):
                 data["cleared"] = ""
         return data
 
-    fill_columns: ClassVar[tuple[str, ...]] = (
-        "checking_bal",
-        "savings_bal",
-        "raisin_bal",
-        "total_bal",
-        "balance_matches",
-    )
-    sort_by_date_field: ClassVar[str] = "date"
+    fill_columns: ClassVar[tuple[str, ...]] = ()
+    sort_by_date_field: ClassVar[str] = "updated"
 
 
 @functools.cache
@@ -305,7 +313,7 @@ class CompaniesImporter(abc.ABC):
 
     reverse_cron = True  # Default value, can be overridden in subclasses
 
-    def __init__(self, prev_lines: list[list[str]] | None = None):
+    def __init__(self, prev_lines: list[CompaniesSheetRow] | None = None):
         self.prev_lines = prev_lines or []
         self.seen_checksums = set()
         self.out_buffer = []
@@ -324,22 +332,13 @@ class CompaniesImporter(abc.ABC):
             self.seen_checksums.add(checksum)
             yield [str(item) for item in line]
 
-    def checksum_finder(self, line: list[str]) -> str | None:
-        checksum_cols = (
-            self.checksum_col
-            if isinstance(self.checksum_col, (list, tuple))
-            else (self.checksum_col,)
-        )
-        for col in checksum_cols:
-            try:
-                return line[col]
-            except IndexError:
-                pass
-        return None
+    def checksum_finder(self, row: CompaniesSheetRow) -> str | None:
+        parts = row.name.lower().split()
+        return checksum(parts)
 
     def update_seen_checksums(self) -> None:
-        for line in self.prev_lines:
-            checksum = self.checksum_finder(line)
+        for row in self.prev_lines:
+            checksum = self.checksum_finder(row)
             if checksum:
                 self.seen_checksums.add(checksum)
 
@@ -409,7 +408,7 @@ class BaseGoogleSheetClient:
     """
     Base class for Google Sheet clients.
     Client classes are responsible for:
-    - Delegating to an Importer and a  FileFinder to get new input data
+    - Delegating to an Importer to get new input data
     - Appending new rows to the Google Sheet
     - Ensuring the Google sheet is correctly sorted, data filled, empty rows cleaned up,
       and formatting preserved.
@@ -449,7 +448,7 @@ class BaseGoogleSheetClient:
         or anytime the sheet is in a messy state.
         """
         # Order matters: If we sort before autofill, it apparently breaks autofill.
-        self.fill_balances_down()
+        self.fill_down()
         self.sort_by_date()
         self.delete_trailing_empty_rows()
         self.update_formatting()
@@ -551,7 +550,7 @@ class BaseGoogleSheetClient:
         values = self.service.spreadsheets().values()
         result = values.get(spreadsheetId=self.doc_id, range=self.range_name).execute()
         values = result.get("values", [])
-        return values
+        return [self.row_class.from_list(line) for line in values]
 
     def get_new_rows(self) -> list[list[str]]:
         prev_line_data = self.read_rows_from_google()
@@ -605,7 +604,7 @@ class BaseGoogleSheetClient:
             )
         self._batch_update(requests)
 
-    def fill_balances_down(self):
+    def fill_down(self):
         # Autofill yay
         # https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/request#autofillrequest
         requests = []
@@ -708,7 +707,6 @@ class MainTabCompaniesClient(BaseGoogleSheetClient):
 
 
 class Config:
-    YEAR = "2024"
     # My companies sheet:
     # For real:
     # https://docs.google.com/spreadsheets/d/1_MXPVn99e3i3MTGFVrBD73T-AwCKWuNS8P34eEI-SA4/edit?gid=0#gid=0
@@ -738,6 +736,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-d", "--dump", action="store_true", help="Dump the existing data to stdout"
+    )
+    parser.add_argument(
         "-s", "--sheet", action="store", choices=["test", "prod"], default="prod"
     )
     return parser.parse_args(argv)
@@ -753,6 +754,11 @@ def main(argv: list[str]):
         sheet_id=config.TAB_1_GID,
         range_name=config.TAB_1_RANGE,
     )
+
+    if args.dump:
+        for row in main_client.read_rows_from_google():
+            print(row)
+        return
 
     csv_infile_name: Optional[str] = args.filename
 
