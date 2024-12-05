@@ -11,7 +11,7 @@ import logging
 import os
 import os.path
 import sys
-from typing import Any, ClassVar, Generator, Iterator, Optional
+from typing import Any, ClassVar, Generator, Iterator, Optional, Iterable
 
 # Third-party imports
 from google.auth.exceptions import RefreshError
@@ -299,16 +299,13 @@ def checksum(line: list[str]):
 
 class CompaniesImporter(abc.ABC):
     """
-    Importers are responsible for loading data from a file,
+    Importers are responsible for loading data eg. from a file,
     parsing the data, and finding new lines (that don't match prev_lines).
 
     generate_data_lines() is the entry point for this.
 
-    May be configured by passing in a concrete FileFinder class,
-    and a list of previously-seen lines from previous runs.
-
     Subclasses will generally want to declare a list of output_column_keys,
-    and override the parse_line method to return either a dict or None.
+    and override the parse_line method to return either a dict, a Row instance or None.
     """
 
     reverse_cron = True  # Default value, can be overridden in subclasses
@@ -324,7 +321,6 @@ class CompaniesImporter(abc.ABC):
         Yields arrays of parsed line data.
         Skips lines that have a checksum that's already been seen.
         """
-        self.load_data()
         for line in self.out_buffer:
             checksum = self.checksum_finder(line)
             if checksum and checksum in self.seen_checksums:
@@ -342,10 +338,8 @@ class CompaniesImporter(abc.ABC):
             if checksum:
                 self.seen_checksums.add(checksum)
 
-    def load_data(self):
-        self.load_transactions()
-
-    def load_transactions(self, account_type: str | None = None):
+    def load_transactions_from_file(self, account_type: str | None = None):
+        # TODO: THis is unused, do we need CSV input at all?
         fname = "TEST.csv"  # TODO: remove
         if fname is None:
             return
@@ -361,33 +355,22 @@ class CompaniesImporter(abc.ABC):
     ) -> dict | None:
         pass
 
-    def process_input_buffer(
-        self, in_buffer, out_buffer, account_type: str | None = None
-    ):
+    def process_input_buffer(self, in_buffer) -> list:
         """
         Process lines of raw csv data, parsing each and writing to a list of lists.
         """
-        account_type = account_type.lower() if account_type else None
         infile = csv.reader(in_buffer, dialect="excel")
 
         for line in infile:
             # First skip lines that aren't transactions.
-            parsed = self.parse_line(line, account_type)
+            parsed = self.parse_line(line)
             if parsed is None:
                 continue
-            if isinstance(parsed, BaseSheetRow):
-                logger.debug(f"  Parsed: {parsed}")
-                out_line = parsed.as_list_of_str()
-                logger.debug([(i, val) for i, val in enumerate(out_line)])
-                self.out_buffer.append(out_line)
-            else:
-                # Dicts here still used by other subclasses.
-                line = [parsed.get(col, "") for col in self.output_column_keys]
-                self.out_buffer.append(line)
-
-        # Most banks we've seen put latest first.
-        if self.reverse_cron:
-            self.out_buffer.reverse()
+            logger.debug(f"  Parsed: {parsed}")
+            out_line = parsed.as_list_of_str()
+            logger.debug([(i, val) for i, val in enumerate(out_line)])
+            # TODO: Why would this be a list of strings instead of Rows?
+            self.out_buffer.append(out_line)
 
         return self.out_buffer
 
@@ -741,6 +724,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "-s", "--sheet", action="store", choices=["test", "prod"], default="prod"
     )
+    parser.add_argument(
+        "-t", "--test-fake-row", action="store_true", help="Test adding a fake row"
+    )
+
     return parser.parse_args(argv)
 
 
@@ -758,6 +745,24 @@ def main(argv: list[str]):
     if args.dump:
         for row in main_client.read_rows_from_google():
             print(row)
+        return
+
+    if args.test_fake_row:
+        import uuid
+
+        name = f"Test Company {uuid.uuid4()}"
+        row = CompaniesSheetRow(
+            name=name,
+            updated=datetime.date.today(),
+            current_state="10. consider applying",
+            base=200,
+            rsu=100,
+            leetcode=True,
+            sys_design=True,
+            ai_notes="Something something LLM",
+        )
+        main_client.append_rows([row.as_list_of_str()])
+        print(f"Loaded row: {row}")
         return
 
     csv_infile_name: Optional[str] = args.filename
