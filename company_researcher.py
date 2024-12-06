@@ -143,7 +143,27 @@ COMPANY_PROMPTS_WITH_FORMAT_PROMPT = [
     (AI_MISSION_PROMPT, AI_MISSION_FORMAT_PROMPT),
 ]
 
+# Add new prompt for extracting company info from email
+EXTRACT_COMPANY_PROMPT = """
+From this recruiter message, extract:
+ - The company name being recruited for
+ - The company's website URL, if mentioned
+ - The role/position being recruited for
+ - The recruiter's name and contact info
 
+----- Recruiter message follows -----
+ {message}
+----- End of recruiter message -----
+"""
+
+EXTRACT_COMPANY_FORMAT_PROMPT = """
+Return these results as a valid JSON object, with the following keys and data types:
+ - company_name: string or null
+ - company_url: string or null  
+ - role: string or null
+ - recruiter_name: string or null
+ - recruiter_contact: string or null
+"""
 class TavilyRAGResearchAgent:
 
     def __init__(self, verbose: bool = False):
@@ -189,18 +209,62 @@ class TavilyRAGResearchAgent:
 
         return "\n".join(parts)
 
-    def main(self, url: str) -> CompaniesSheetRow:
+    def extract_initial_company_info(self, message: str) -> dict:
+        """Extract basic company info from recruiter message"""
+        try:
+            full_prompt = self.make_prompt(
+                EXTRACT_COMPANY_PROMPT.format(message=message),
+                EXTRACT_COMPANY_FORMAT_PROMPT,
+                extra_context="",  # No need for search context when parsing message directly
+            )
+            result = self.llm.invoke(full_prompt)
+            return json.loads(result.content)
+        except Exception as e:
+            logger.error(f"Error extracting company info: {e}")
+            return {}
+
+    def main(self, *, url: str = None, message: str = None) -> CompaniesSheetRow:
+        """
+        Research a company based on either a URL or a recruiter message.
+        One of url or message must be provided.
+
+        Args:
+            url: Company URL to research
+            message: Recruiter message to analyze
+        """
+        if all([url, message]) or not any([url, message]):
+            raise ValueError("Exactly one of url or message must be provided")
+
         tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 
-        # Initialize with URL and today's date
         data = CompaniesSheetRow(
             url=url,
             updated=datetime.date.today(),
             current_state="10. consider applying",  # Default initial state
         )
 
+        if message:
+            company_info = self.extract_initial_company_info(message)
+            data.name = company_info.get("company_name", "")
+            data.url = company_info.get("company_url", "")
+            data.recruit_contact = company_info.get("recruiter_name", "")
+            print(f"Company info: {data}")
+
         for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
-            prompt = prompt.format(company_url=url)
+            # If we're working with a message, include it in the context
+            if message:
+                prompt = f"""
+                Using this recruiter message as part of the context:
+                --- Recruiter message follows ---
+                {message}
+                --- End of recruiter message ---
+                {prompt}
+                """
+
+            # Use URL if we have it, otherwise use company name
+            company_identifier = data.url or data.name
+            prompt = prompt.format(company_url=company_identifier)
+
             if len(prompt) > GET_SEARCH_CONTEXT_INPUT_LIMIT:
                 logger.warning(
                     f"Truncating prompt from {len(prompt)} to {GET_SEARCH_CONTEXT_INPUT_LIMIT} characters"
@@ -248,14 +312,7 @@ class TavilyRAGResearchAgent:
                 if "ai_notes" in content:
                     data.ai_notes = content["ai_notes"]
                 if "public_status" in content:
-                    # Map funding status to company type
-                    status = content["public_status"]
-                    if status == "public":
-                        data.type = "public"
-                    elif status == "private unicorn":
-                        data.type = "unicorn"
-                    elif status == "private":
-                        data.type = "private"
+                    data.type = content["public_status"]
 
                 logger.info(f"  DATA SO FAR:\n{data}\n\n")
 
@@ -267,21 +324,45 @@ class TavilyRAGResearchAgent:
 
 
 def main(
-    url, model, refresh_rag_db: bool = False, verbose: bool = False
+    url_or_message: str,
+    model: str,
+    refresh_rag_db: bool = False,
+    verbose: bool = False,
+    is_url: bool | None = None,
 ) -> CompaniesSheetRow:
+    """
+    Research a company based on either a URL or a recruiter message.
+
+    Args:
+        url_or_message: Either a company URL or a recruiter message
+        model: The LLM model to use
+        refresh_rag_db: Whether to refresh the RAG database
+        verbose: Whether to enable verbose logging
+        is_url: Force interpretation as URL (True) or message (False). If None, will try to auto-detect.
+    """
     researcher = TavilyRAGResearchAgent(verbose=verbose)
-    return researcher.main(url)
+
+    # Auto-detect if not specified
+    if is_url is None:
+        is_url = url_or_message.startswith(("http://", "https://"))
+
+    if is_url:
+        return researcher.main(url=url_or_message)
+    else:
+        return researcher.main(message=url_or_message)
 
 
 if __name__ == '__main__':
     import argparse
     import sys
 
-    if len(sys.argv) < 2:
-        sys.argv.append("https://rokt.com")  # HACK for testing
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("url", help="URL of the company to research")
+    parser.add_argument("input", help="URL of company or recruiter message to research")
+    parser.add_argument(
+        "--type",
+        choices=["url", "message"],
+        help="Force interpretation as URL or message. If not specified, will auto-detect.",
+    )
     parser.add_argument(
         "--model",
         help="AI model to use",
@@ -305,11 +386,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
+
+    is_url = None if args.type is None else (args.type == "url")
+
     data = main(
-        args.url,
+        args.input,
         model=args.model,
         refresh_rag_db=args.refresh_rag_db,
         verbose=args.verbose,
+        is_url=is_url,
     )
     import pprint
     pprint.pprint(data)
