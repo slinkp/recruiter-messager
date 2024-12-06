@@ -260,16 +260,6 @@ class TavilyRAGResearchAgent:
             print(f"Company info: {data}")
 
         for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
-            # If we're working with a message, include it in the context
-            if message:
-                prompt = f"""
-                Using this recruiter message as part of the context:
-                --- Recruiter message follows ---
-                {message}
-                --- End of recruiter message ---
-                {prompt}
-                """
-
             # Use URL if we have it, otherwise use company name
             company_identifier = data.url or data.name
             prompt = prompt.format(company_url=company_identifier)
