@@ -216,6 +216,24 @@ class TavilyRAGResearchAgent:
             logger.error(f"Error extracting company info: {e}")
             return {}
 
+    def get_search_context(self, prompt: str) -> str:
+        if len(prompt) > GET_SEARCH_CONTEXT_INPUT_LIMIT:
+            logger.warning(
+                f"Truncating prompt from {len(prompt)} to {GET_SEARCH_CONTEXT_INPUT_LIMIT} characters"
+            )
+            prompt = prompt[:GET_SEARCH_CONTEXT_INPUT_LIMIT]
+            logger.debug(f"Prompt truncated: {prompt}")
+        else:
+            logger.debug(f"Prompt not truncated: {prompt}")
+
+        context = self.tavily_client.get_search_context(
+            query=prompt,
+            max_tokens=1000 * 20,
+            max_results=10,
+            search_depth="advanced",
+        )
+        return context
+
     def main(self, *, url: str = None, message: str = None) -> CompaniesSheetRow:
         """
         Research a company based on either a URL or a recruiter message.
@@ -256,22 +274,8 @@ class TavilyRAGResearchAgent:
             company_identifier = data.url or data.name
             prompt = prompt.format(company_url=company_identifier)
 
-            if len(prompt) > GET_SEARCH_CONTEXT_INPUT_LIMIT:
-                logger.warning(
-                    f"Truncating prompt from {len(prompt)} to {GET_SEARCH_CONTEXT_INPUT_LIMIT} characters"
-                )
-                prompt = prompt[:GET_SEARCH_CONTEXT_INPUT_LIMIT]
-                logger.debug(f"Prompt truncated: {prompt}")
-            else:
-                logger.debug(f"Prompt not truncated: {prompt}")
-
             try:
-                context = self.tavily_client.get_search_context(
-                    query=prompt,
-                    max_tokens=1000 * 20,
-                    max_results=10,
-                    search_depth="advanced",
-                )
+                context = self.get_search_context(prompt)
                 logger.debug(f"  Got Context: {len(context)}")
                 full_prompt = self.make_prompt(
                     prompt, format_prompt, extra_context=context
