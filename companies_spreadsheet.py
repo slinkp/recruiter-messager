@@ -26,15 +26,10 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 FIRST_DATA_ROW = 2  # 0-indexed
 
-# Possible enhancements/ TODOs:
-# - Update data range of balance-vs-date chart
-# - MAYBE: Interactively suggest un-cleared transactions to replace, delete,
-#   or move to future date?
 
 import dataclasses
 import dateutil.parser
 from typing import Generator, Optional, Union, Any, ClassVar, Iterator
-import re
 import sys
 import logging
 from pydantic import BaseModel, Field, ValidationError, model_validator
@@ -200,7 +195,7 @@ class CompaniesSheetRow(BaseSheetRow):
     latest_step: Optional[str] = Field(default=None)
     next_step: Optional[str] = Field(default=None)
     next_step_date: Optional[datetime.date] = Field(default=None)
-    latest_contact: Optional[datetime.date] = Field(default=None)
+    latest_contact: Optional[str] = Field(default=None)
 
     end_date: Optional[datetime.date] = Field(default=None)
 

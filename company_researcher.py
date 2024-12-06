@@ -15,6 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.output_parsers.json import SimpleJsonOutputParser
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator
+import datetime
 import os
 
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
@@ -27,46 +28,12 @@ from tavily import TavilyClient
 from langchain_community.cache import SQLiteCache
 from langchain_core.globals import set_llm_cache
 
+from companies_spreadsheet import CompaniesSheetRow
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
 
 logger = logging.getLogger(__name__)
-
-
-class CompanyInfo(BaseModel):
-    model_config = {
-        "strict": True,
-        "extra": "forbid",
-    }
-
-    company: Optional[str] = Field(default=None, description="The name of the company")
-    funding_status: Optional[
-        Literal["public", "private", "unicorn", "private finance"]
-    ] = Field(default=None, description="The funding status of the company")
-    mission: Optional[str] = Field(
-        default=None, description="The mission of the company"
-    )
-    work_policy: Optional[Literal["remote", "hybrid", "onsite"]] = Field(
-        default=None, description="The work policy of the company"
-    )
-    total_employees: Optional[int] = Field(
-        default=None, description="The total number of employees"
-    )
-    total_engineers: Optional[int] = Field(
-        default=None, description="The total number of engineers"
-    )
-    nyc_employees: Optional[int] = Field(
-        default=None, description="The number of employees in NYC"
-    )
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def handle_unknown(cls, v):
-        # Some models return "UNKNOWN" or "<UNKNOWN>" for unknown values, disregarding
-        # our instructions to use null.
-        if isinstance(v, str) and "UNKNOWN" in v:
-            return None
-        return v
 
 
 # Tavily API has undocumented input limit of 400 for get_search_context(query)
@@ -221,11 +188,17 @@ class TavilyRAGResearchAgent:
         )
 
         return "\n".join(parts)
-    def main(self, url: str) -> dict:
 
+    def main(self, url: str) -> CompaniesSheetRow:
         tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 
-        data = {"citation_urls": []}
+        # Initialize with URL and today's date
+        data = CompaniesSheetRow(
+            url=url,
+            updated=datetime.date.today(),
+            current_state="10. consider applying",  # Default initial state
+        )
+
         for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
             prompt = prompt.format(company_url=url)
             if len(prompt) > GET_SEARCH_CONTEXT_INPUT_LIMIT:
@@ -237,25 +210,65 @@ class TavilyRAGResearchAgent:
             else:
                 logger.debug(f"Prompt not truncated: {prompt}")
 
-            context = tavily_client.get_search_context(
-                query=prompt,
-                max_tokens=1000 * 20,
-                max_results=10,
-                search_depth="advanced",
-            )
-            logger.debug(f"  Got Context: {len(context)}")
-            full_prompt = self.make_prompt(prompt, format_prompt, extra_context=context)
-            logger.debug(f"  Full prompt:\n\n {full_prompt}\n\n")
-            result = self.llm.invoke(full_prompt)
-            content = json.loads(result.content)
-            citation_urls = content.pop("citation_urls", [])
-            data.update(content)
-            data["citation_urls"].extend(citation_urls)
-            logger.info(f"  DATA SO FAR:\n{json.dumps(data, indent=2)}\n\n")
+            try:
+                context = tavily_client.get_search_context(
+                    query=prompt,
+                    max_tokens=1000 * 20,
+                    max_results=10,
+                    search_depth="advanced",
+                )
+                logger.debug(f"  Got Context: {len(context)}")
+                full_prompt = self.make_prompt(
+                    prompt, format_prompt, extra_context=context
+                )
+                logger.debug(f"  Full prompt:\n\n {full_prompt}\n\n")
+                result = self.llm.invoke(full_prompt)
+                content = json.loads(result.content)
+
+                # Map the API response fields to CompaniesSheetRow fields
+                if "total_employees" in content:
+                    data.total_size = content["total_employees"]
+                if "total_engineers" in content:
+                    data.eng_size = content["total_engineers"]
+                if "nyc_office_address" in content:
+                    data.ny_address = content["nyc_office_address"]
+                if "remote_work_policy" in content:
+                    # Map remote work policy to expected values
+                    policy = content["remote_work_policy"].lower()
+                    if "remote" in policy:
+                        data.remote_policy = "remote"
+                    elif "hybrid" in policy:
+                        data.remote_policy = "hybrid"
+                    elif "in-person" in policy:
+                        data.remote_policy = "onsite"
+                if "interview_style_systems" in content:
+                    data.sys_design = content["interview_style_systems"]
+                if "interview_style_leetcode" in content:
+                    data.leetcode = content["interview_style_leetcode"]
+                if "ai_notes" in content:
+                    data.ai_notes = content["ai_notes"]
+                if "public_status" in content:
+                    # Map funding status to company type
+                    status = content["public_status"]
+                    if status == "public":
+                        data.type = "public"
+                    elif status == "private unicorn":
+                        data.type = "unicorn"
+                    elif status == "private":
+                        data.type = "private"
+
+                logger.info(f"  DATA SO FAR:\n{data}\n\n")
+
+            except Exception as e:
+                logger.error(f"Error processing prompt: {e}")
+                continue
+
         return data
 
 
-def main(url, model, refresh_rag_db: bool = False, verbose: bool = False):
+def main(
+    url, model, refresh_rag_db: bool = False, verbose: bool = False
+) -> CompaniesSheetRow:
     researcher = TavilyRAGResearchAgent(verbose=verbose)
     return researcher.main(url)
 

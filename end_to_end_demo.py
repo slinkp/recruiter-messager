@@ -3,6 +3,7 @@ import os.path
 import company_researcher
 from rag import RecruitmentRAG
 import email_client
+import datetime
 import logging
 import argparse
 import json
@@ -10,6 +11,9 @@ import functools
 from diskcache import Cache
 from functools import wraps
 from enum import Enum, auto
+from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
+import companies_spreadsheet
+
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +73,7 @@ def should_clear_cache(args, step: CacheStep) -> bool:
 
 
 @disk_cache(CacheStep.BASIC_RESEARCH)
-def initial_research_company(message: str) -> company_researcher.CompanyInfo:
+def initial_research_company(message: str) -> CompaniesSheetRow:
     # TODO: Implement this:
     # - Enhance company_researcher.py to work with a blob of data (not just a company name)
     # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
@@ -78,13 +82,16 @@ def initial_research_company(message: str) -> company_researcher.CompanyInfo:
     # - use levels_searcher.py to find salary data
     # - Enhance the response with whether the company is a good fit for me
     # - Add the research to the RAG context
-    # - Add the structured research data to my spreadsheet
-    # - TBD:Maybe we just return CompanyInfo? And all the other stuff is done elsewhere?
-    return company_researcher.CompanyInfo()
+    # - Add the structured research data to this return data
+    return CompaniesSheetRow(
+        name="",  # Will be filled in later
+        updated=datetime.date.today(),
+        current_state="10. consider applying",
+    )
 
 
 @disk_cache(CacheStep.FOLLOWUP_RESEARCH)
-def followup_research_company(company_info: company_researcher.CompanyInfo):
+def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheetRow:
     # TODO: Implement this:
     # - use linkedin_searcher.py to find contacts
     # - Store those somewhere.  Where? Spreadsheet - update existing row?
@@ -92,7 +99,7 @@ def followup_research_company(company_info: company_researcher.CompanyInfo):
     return company_info
 
 
-def is_good_fit(company_info: company_researcher.CompanyInfo):
+def is_good_fit(company_info: CompaniesSheetRow) -> bool:
     # TODO: basic heuristic for now
     return False
 
@@ -203,9 +210,21 @@ class EmailResponder:
         return combined_messages
 
 
-def update_spreadsheet(company_info: company_researcher.CompanyInfo):
-    # TODO: Implement this
-    pass
+def add_company_to_spreadsheet(
+    company_info: CompaniesSheetRow, args: argparse.Namespace
+):
+    if args.sheet == "test":
+        config = companies_spreadsheet.TestConfig
+    else:
+        config = companies_spreadsheet.Config
+    client = MainTabCompaniesClient(
+        doc_id=config.SHEET_DOC_ID,
+        sheet_id=config.TAB_1_GID,
+        range_name=config.TAB_1_RANGE,
+    )
+
+    # TODO: Check if the company already exists in the sheet, and update instead of appending
+    client.append_rows([company_info.as_list_of_str()])
 
 
 def main(args, loglevel: int = logging.INFO):
@@ -246,7 +265,7 @@ def main(args, loglevel: int = logging.INFO):
         reply = maybe_edit_reply(reply)
         send_reply(reply)
         archive_message(msg)
-        update_spreadsheet(company_info)
+        add_company_to_spreadsheet(company_info, args)
 
 
 if __name__ == "__main__":
@@ -295,6 +314,15 @@ if __name__ == "__main__":
         "--test-messages",
         action="append",
         help="Test messages to use instead of fetching from Gmail",
+    )
+
+    parser.add_argument(
+        "-s",
+        "--sheet",
+        action="store",
+        choices=["test", "prod"],
+        default="prod",
+        help="Use the test or production spreadsheet",
     )
     args = parser.parse_args()
     loglevel = logging.DEBUG if args.verbose else logging.INFO
