@@ -166,21 +166,14 @@ Return these results as a valid JSON object, with the following keys and data ty
 """
 class TavilyRAGResearchAgent:
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, llm: Optional[object] = None):
 
         # set up the agent
-        self.llm = ChatOpenAI(model_name="gpt-4", temperature=0.7)
-        self.search_wrapper = TavilySearchAPIWrapper()
-        self.tavily_tool = TavilySearchResults(api_wrapper=self.search_wrapper)
-
+        self.llm = llm or ChatOpenAI(model_name="gpt-4", temperature=0.7)
         # Cache to reduce LLM calls.
         set_llm_cache(SQLiteCache(database_path=".langchain-cache.db"))
-        # Note this chain can ONLY use ChatOpenAI, not ChatAnthropic.
-        # Is there a workaround?
-        self.agent_chain = create_conversational_retrieval_agent(
-            self.llm, [self.tavily_tool], verbose=verbose
-        )
         self.verbose = verbose
+        self.tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
 
     def make_prompt(
         self, search_prompt: str, format_prompt: str, extra_context: str = "", **kwargs
@@ -235,8 +228,6 @@ class TavilyRAGResearchAgent:
         if all([url, message]) or not any([url, message]):
             raise ValueError("Exactly one of url or message must be provided")
 
-        tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
-
         data = CompaniesSheetRow(
             url=url,
             updated=datetime.date.today(),
@@ -275,7 +266,7 @@ class TavilyRAGResearchAgent:
                 logger.debug(f"Prompt not truncated: {prompt}")
 
             try:
-                context = tavily_client.get_search_context(
+                context = self.tavily_client.get_search_context(
                     query=prompt,
                     max_tokens=1000 * 20,
                     max_results=10,
@@ -326,7 +317,7 @@ class TavilyRAGResearchAgent:
 def main(
     url_or_message: str,
     model: str,
-    refresh_rag_db: bool = False,
+    refresh_rag_db: bool = False,  # TODO: Unused
     verbose: bool = False,
     is_url: bool | None = None,
 ) -> CompaniesSheetRow:
@@ -340,7 +331,15 @@ def main(
         verbose: Whether to enable verbose logging
         is_url: Force interpretation as URL (True) or message (False). If None, will try to auto-detect.
     """
-    researcher = TavilyRAGResearchAgent(verbose=verbose)
+    TEMPERATURE = 0.7
+    if model.startswith("gpt-"):
+        llm = ChatOpenAI(model_name=model, temperature=TEMPERATURE)
+    elif model.startswith("claude"):
+        llm = ChatAnthropic(model_name=model, temperature=TEMPERATURE)
+    else:
+        raise ValueError(f"Unknown model: {model}")
+
+    researcher = TavilyRAGResearchAgent(verbose=verbose, llm=llm)
 
     # Auto-detect if not specified
     if is_url is None:
@@ -367,7 +366,7 @@ if __name__ == '__main__':
         "--model",
         help="AI model to use",
         action="store",
-        default="gpt-4o",
+        default="claude-3-5-sonnet-latest",
         choices=[
             "gpt-4o",
             "gpt-4-turbo",
