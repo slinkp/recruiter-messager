@@ -42,12 +42,11 @@ GET_SEARCH_CONTEXT_INPUT_LIMIT = 400
 
 # PROMPT_LIMIT
 BASIC_COMPANY_PROMPT = """
-For the company at {company_url}, find:
+For the company at {company_info.company_identifier}, find:
  - City and country of the company's headquarters.
  - Address of the company's NYC office, if there is one.
  - Total number of employees worldwide. 
- - Number of employees at NYC office, if any.
- - Number of employees who are egineers.
+ - Number of employees who are engineers.
 """
 
 BASIC_COMPANY_FORMAT_PROMPT = """
@@ -55,7 +54,6 @@ Return these results as a valid JSON object, with the following keys and data ty
  - headquarters_city: string or null
  - nyc_office_address: string or null
  - total_employees: integer or null
- - nyc_employees: integer or null
  - total_engineers: integer or null
 
 The value of nyc_office_address, if known, must be returned as a valid US mailing address with a street address, 
@@ -66,7 +64,7 @@ The value of headquarters_city must be the city, state/province, and country of 
 # """
 
 FUNDING_STATUS_PROMPT = """
-For the company at {company_url}, find:
+For the company at {company_info.company_identifier}, find:
  - The company's public/private status.  If there is a stock symbol, it's public.
    If private and valued at over $1B, call it a "unicorn".
  - The company's latest valuation, in millions of dollars, if known.
@@ -81,7 +79,7 @@ Return these results as a valid JSON object, with the following keys and data ty
  """
 
 EMPLOYMENT_PROMPT = """
-For the company at {company_url}, find:
+For the company at {company_info.company_identifier}, find:
     - the company's remote work policy
     - whether the company is currently hiring backend engineers
     - whether the company is hiring backend engineers with AI experience
@@ -98,7 +96,7 @@ Return these results as a valid JSON object, with the following keys and data ty
 """
 
 INTERVIEW_STYLE_PROMPT = """
-For the company at {company_url}, find:
+For the company at {company_info.company_identifier}, find:
     - whether engineers are expected to do a systems design interview
     - whether engineers are expected to do a leetcode style coding interview
 """
@@ -111,7 +109,7 @@ Return these results as a valid JSON object, with the following keys and data ty
 """
 
 AI_MISSION_PROMPT = """
-Is the company at {company_url} a company that uses AI?
+Is the company at {company_info.company_identifier} a company that uses AI?
 Look for blog posts, press releases, news articles, etc. about whether and how AI 
 is used for the company's products or services, whether as public-facing features or
 internal implementation. Another good clue is whether the company is hiring AI engineers.
@@ -211,6 +209,7 @@ class TavilyRAGResearchAgent:
                 extra_context="",  # No need for search context when parsing message directly
             )
             result = self.llm.invoke(full_prompt)
+            # TODO: also use the recruiter's email, if there is one, not just name.
             return json.loads(result.content)
         except Exception as e:
             logger.error(f"Error extracting company info: {e}")

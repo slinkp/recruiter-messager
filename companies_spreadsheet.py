@@ -179,6 +179,16 @@ class BaseSheetRow(BaseModel):
         field_names = [name for name in cls.model_fields.keys()]
         return cls(**dict(zip(field_names, row_data)))
 
+    @property
+    def company_identifier(self) -> str:
+        if self.name and self.url:
+            return f"{self.name} at {self.url}"
+        elif self.name:
+            return self.name
+        elif self.url:
+            return self.url
+        return ""
+
 
 class CompaniesSheetRow(BaseSheetRow):
     # Order determines index of column in sheet!
