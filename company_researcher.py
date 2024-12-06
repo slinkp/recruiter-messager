@@ -245,66 +245,76 @@ class TavilyRAGResearchAgent:
         if all([url, message]) or not any([url, message]):
             raise ValueError("Exactly one of url or message must be provided")
 
-        data = CompaniesSheetRow(
+        company_info = CompaniesSheetRow(
             url=url,
             updated=datetime.date.today(),
             current_state="10. consider applying",  # Default initial state
         )
 
         if message:
-            company_info = self.extract_initial_company_info(message)
-            data.name = company_info.get("company_name", "")
-            data.url = company_info.get("company_url", "")
-            data.recruit_contact = company_info.get("recruiter_name", "")
-            print(f"Company info: {data}")
+            data = self.extract_initial_company_info(message)
+            company_info.name = data.get("company_name", "")
+            company_info.url = data.get("company_url", "")
+            company_info.recruit_contact = data.get("recruiter_name", "")
+            print(f"Company info: {company_info}")
 
         for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
-            # Use URL if we have it, otherwise use company name
-            company_identifier = data.url or data.name
-            prompt = prompt.format(company_url=company_identifier)
-
             try:
                 context = self.get_search_context(prompt)
                 logger.debug(f"  Got Context: {len(context)}")
                 full_prompt = self.make_prompt(
-                    prompt, format_prompt, extra_context=context
+                    prompt,
+                    format_prompt,
+                    extra_context=context,
+                    company_info=company_info,
                 )
                 logger.debug(f"  Full prompt:\n\n {full_prompt}\n\n")
                 result = self.llm.invoke(full_prompt)
                 content = json.loads(result.content)
+                logger.debug(f"  Content returned from llm:\n\n {content}\n\n")
 
                 # Map the API response fields to CompaniesSheetRow fields
-                if "total_employees" in content:
-                    data.total_size = content["total_employees"]
-                if "total_engineers" in content:
-                    data.eng_size = content["total_engineers"]
-                if "nyc_office_address" in content:
-                    data.ny_address = content["nyc_office_address"]
-                if "remote_work_policy" in content:
-                    # Map remote work policy to expected values
-                    policy = content["remote_work_policy"].lower()
-                    if "remote" in policy:
-                        data.remote_policy = "remote"
-                    elif "hybrid" in policy:
-                        data.remote_policy = "hybrid"
-                    elif "in-person" in policy:
-                        data.remote_policy = "onsite"
-                if "interview_style_systems" in content:
-                    data.sys_design = content["interview_style_systems"]
-                if "interview_style_leetcode" in content:
-                    data.leetcode = content["interview_style_leetcode"]
-                if "ai_notes" in content:
-                    data.ai_notes = content["ai_notes"]
-                if "public_status" in content:
-                    data.type = content["public_status"]
-
-                logger.info(f"  DATA SO FAR:\n{data}\n\n")
-
+                self.update_company_info_from_dict(company_info, content)
             except Exception as e:
                 logger.error(f"Error processing prompt: {e}")
                 continue
 
-        return data
+    def update_company_info_from_dict(
+        self, company_info: CompaniesSheetRow, content: dict
+    ):
+        def update_field_from_key_if_present(fieldname, key):
+            if content.get(key, "").lower().strip() in (
+                "",
+                "null",
+                "undefined",
+                "unknown",
+            ):
+                return
+            setattr(company_info, fieldname, content[key])
+
+        update_field_from_key_if_present("ny_address", "nyc_office_address")
+        update_field_from_key_if_present("headquarters", "headquarters_city")
+        update_field_from_key_if_present("eng_size", "total_engineers")
+        update_field_from_key_if_present("total_size", "total_employees")
+
+        # Funding info
+        update_field_from_key_if_present("valuation", "valuation")
+        update_field_from_key_if_present("funding_series", "funding_series")
+        update_field_from_key_if_present("type", "public_status")
+
+        # Interview type info
+        update_field_from_key_if_present("sys_design", "interview_style_systems")
+        update_field_from_key_if_present("leetcode", "interview_style_leetcode")
+
+        update_field_from_key_if_present("url", "jobs_homepage_url")
+        update_field_from_key_if_present("remote_policy", "remote_work_policy")
+        # TODO: hiring_status, hiring_status_ai
+        # TODO: uses_ai
+
+        update_field_from_key_if_present("ai_notes", "ai_notes")
+
+        logger.debug(f"  DATA SO FAR:\n{company_info}\n\n")
+        return company_info
 
 
 def main(
