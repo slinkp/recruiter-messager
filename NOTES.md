@@ -231,3 +231,31 @@ total comp: $167,961
 base salary: $160.8k
 stock: $7.2k
 bonus: N/A
+
+
+
+# Possible future explorations: local models
+
+Per podcast ("Practical AI" 2023-10-03 episode "Generative models: exploration
+to deployment")
+- Search huggingface by type
+- look for "spaces" where people demo models so you can get a sense what they
+  do
+- 2023 rule of thumb: 7B is kind of the limit of what you can run on one GPU and maybe pushing it
+  for a consumer GPU
+- Start with smaller models and work your way up to the bigger ones until you
+  find the right behavior
+  - smaller is faster to iterate: latency etc
+- Then figure out the infra you need for that
+- Strongly consider model optimization techniques: There are open source tools
+  for that
+- Convince yourself you can't run it on a single GPU before you spin up a
+  cluster
+- To try a model: look for code snippet on their huggingface card (like a
+  readme)
+  - spin up a Google Collab (co-lab?) page
+  - Paste in that code
+  - At top right, look at the resource thing
+  - You can see how much GPU and CPU memory you're using just for loading the
+    model and doing a single inference
+  - that'll give you a ballpark for what GPU you need to run it locally w/o optimization

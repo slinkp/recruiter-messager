@@ -154,6 +154,8 @@ Can RAG or other AI techniques help automate this?
       - [ ] Try again with a "known good" website, ie one where I know what info to expect?
   - [x] Try with Tavily search
       - [x] Lots of decisions to make here per https://blog.langchain.dev/weblangchain/
+      - [ ] Report Tavily issue: Undocumented 400 character limit on get_search_context(query). Client gets a 400 error, but no indication of what's wrong.
+
 - [x] formalize my research steps
   - [x] General info
     - [x] company name
