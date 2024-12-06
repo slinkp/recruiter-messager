@@ -277,13 +277,17 @@ class TavilyRAGResearchAgent:
                 self.update_company_info_from_dict(company_info, content)
             except Exception as e:
                 logger.error(f"Error processing prompt: {e}")
-                continue
+                raise
+        return company_info
 
     def update_company_info_from_dict(
         self, company_info: CompaniesSheetRow, content: dict
     ):
         def update_field_from_key_if_present(fieldname, key):
-            if content.get(key, "").lower().strip() in (
+            val = content.get(key, "")
+            val = "" if val is None else val
+            val = val.lower().strip() if isinstance(val, str) else val
+            if val in (
                 "",
                 "null",
                 "undefined",
@@ -334,7 +338,7 @@ def main(
         verbose: Whether to enable verbose logging
         is_url: Force interpretation as URL (True) or message (False). If None, will try to auto-detect.
     """
-    TEMPERATURE = 0.7
+    TEMPERATURE = 0.7  # TBD what's a good range for this use case? Is this high?
     if model.startswith("gpt-"):
         llm = ChatOpenAI(model_name=model, temperature=TEMPERATURE)
     elif model.startswith("claude"):

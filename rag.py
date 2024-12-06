@@ -100,12 +100,20 @@ class RecruitmentRAG:
         if self.retriever is None:
             raise ValueError("Data not prepared. Call prepare_data() first.")
 
+        TEMPERATURE = 0.2  # Lowish because we're writing email to real people.
+
         if llm_type.lower() == "openai":
-            llm = ChatOpenAI(temperature=0.2)
+            llm = ChatOpenAI(temperature=TEMPERATURE)
         elif llm_type.lower() == "claude":
-            llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0.2)
+            llm = ChatAnthropic(
+                model="claude-3-5-sonnet-20240620", temperature=TEMPERATURE
+            )
+        elif llm_type.startswith("gpt"):
+            llm = ChatOpenAI(model=llm_type, temperature=TEMPERATURE)
+        elif llm_type.startswith("claude"):
+            llm = ChatAnthropic(model=llm_type, temperature=TEMPERATURE)
         else:
-            raise ValueError("Invalid llm_type. Choose 'openai' or 'claude'.")
+            raise ValueError(f"Invalid llm_type. Choose 'openai' or 'claude' or 'gpt'.")
 
         prompt = ChatPromptTemplate.from_template(TEMPLATE)
 

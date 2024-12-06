@@ -73,21 +73,15 @@ def should_clear_cache(args, step: CacheStep) -> bool:
 
 
 @disk_cache(CacheStep.BASIC_RESEARCH)
-def initial_research_company(message: str) -> CompaniesSheetRow:
+def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
+    row = company_researcher.main(url_or_message=message, model=model, is_url=False)
     # TODO: Implement this:
-    # - Enhance company_researcher.py to work with a blob of data (not just a company name)
     # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
     #   and pass that to company_researcher.py too
-    # - Use company_researcher.py to research the company, if possible
     # - use levels_searcher.py to find salary data
     # - Enhance the response with whether the company is a good fit for me
-    # - Add the research to the RAG context
-    # - Add the structured research data to this return data
-    return CompaniesSheetRow(
-        name="",  # Will be filled in later
-        updated=datetime.date.today(),
-        current_state="10. consider applying",
-    )
+    # - Add the research to the RAG context for email generation
+    return row
 
 
 @disk_cache(CacheStep.FOLLOWUP_RESEARCH)
@@ -255,7 +249,9 @@ def main(args, loglevel: int = logging.INFO):
             f"==============================\n\nProcessing message:\n\n{content}\n"
         )
         # TODO: pass subject too?
-        company_info = initial_research_company(content, use_cache=not args.no_cache)
+        company_info = initial_research_company(
+            content, model=args.model, use_cache=not args.no_cache
+        )
         logger.info(f"Company info: {company_info}\n\n")
         reply = email_responder.generate_reply(content)
         logger.info(f"------ GENERATED REPLY:\n{reply}\n\n")
@@ -273,8 +269,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Print verbose logging"
     )
+
     parser.add_argument(
-        "--model", action="store", choices=["openai", "claude"], default="claude"
+        "--model",
+        help="AI model to use",
+        action="store",
+        default="claude-3-5-sonnet-latest",
+        choices=[
+            "gpt-4o",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "claude-3-5-sonnet-latest",
+        ],
     )
     parser.add_argument(
         "--limit",
