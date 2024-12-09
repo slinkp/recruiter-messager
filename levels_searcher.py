@@ -284,24 +284,31 @@ class LevelsFyiSearcher:
             logger.info("Already on salary page, skipping navigation...")
             return
 
-        logger.info(f"Current URL: {self.page.url}")
-        try:
-            # Look for Software Engineer link by its heading and href pattern
-            swe_link = (
-                self.page.get_by_role("link", name="Software Engineer", exact=False)
-                .filter(has=self.page.locator("h6:has-text('Software Engineer')"))
-                .first
-            )
+        if self.page.url.endswith("/culture"):
+            # TODO are there other cases of company search landing elsewhere?
+            logger.debug("Landed on culture page...")
+            url = self.page.url.replace("/culture", "/salaries")
+            self.page.goto(url)
+            self.random_delay()
 
-            if swe_link.is_visible(timeout=5000):
-                logger.info("Found Software Engineer link, clicking it...")
-                swe_link.click()
-                self.random_delay()  # Wait for navigation
-            else:
-                raise Exception("Software Engineer link not visible")
-        except Exception as e:
-            logger.error(f"Could not find Software Engineer link: {e}")
-            raise Exception("Could not find Software Engineer role on company page")
+        logger.info(f"Current URL: {self.page.url}")
+
+        # Look for Software Engineer link by its heading and href pattern
+        swe_link = (
+            self.page.get_by_role("link", name="Software Engineer", exact=False)
+            .filter(has=self.page.locator("h6:has-text('Software Engineer')"))
+            .first
+        )
+
+        if swe_link.is_visible(timeout=5000):
+            logger.info("Found Software Engineer link, clicking it...")
+            swe_link.click()
+            self.random_delay()  # Wait for navigation
+        else:
+            self.page.screenshot(path="swe_link_not_visible.png")
+            raise RuntimeError(
+                f"Software Engineer link not visible on page {self.page.url}. See screenshot swe_link_not_visible.png"
+            )
 
 class SalarySearcher:
     def __init__(self, page):
@@ -311,7 +318,7 @@ class SalarySearcher:
             "table[aria-label='Salary Submissions']"
         ).first
         if not self.salary_table.is_visible(timeout=5000):
-            raise Exception(f"Could not find salary table on page {self.page.url}")
+            raise RuntimeError(f"Could not find salary table on page {self.page.url}")
 
     def get_salary_data(self):
         logger.info(f"Looking for salary table on {self.page.url}...")
@@ -657,7 +664,7 @@ class SalarySearcher:
             raise Exception("Could not determine number of results")
 
 
-def main(company_name: str, company_salary_url: str):
+def main(company_name: str = "", company_salary_url: str = ""):
     searcher = LevelsFyiSearcher()
     try:
         results = []
