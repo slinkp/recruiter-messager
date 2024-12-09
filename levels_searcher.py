@@ -55,15 +55,12 @@ class LevelsFyiSearcher:
         # All of these work by side effects or raising exceptions
         self.search_by_company_name(company_name)
         self.random_delay()
-        self._navigate_to_salary_page()
-        self.random_delay()
         return self.find_and_extract_salaries()
 
-    def test_shopify_salary(self) -> List[Dict]:
-        """Test method that loads Shopify salary data for Canada"""
-        logger.info("Running Shopify salary test for Canada")
-        url = "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
-        self.page.goto(url)
+    def test_company_salary(self, company_salary_url: str) -> List[Dict]:
+        """Test method that loads salary data when we already have the URL"""
+        logger.info(f"Running test for {company_salary_url}")
+        self.page.goto(company_salary_url)
         self.random_delay(1, 2)
 
         # Check if we need to login
@@ -71,7 +68,7 @@ class LevelsFyiSearcher:
             logger.info("Hit login wall, attempting login...")
             self.login()
             # Return to the Shopify page
-            self.page.goto(url)
+            self.page.goto(company_salary_url)
             self.random_delay()
 
         return self.find_and_extract_salaries()
@@ -660,19 +657,22 @@ class SalarySearcher:
             raise Exception("Could not determine number of results")
 
 
-def main():
+def main(company_name: str, company_salary_url: str):
     searcher = LevelsFyiSearcher()
     try:
         results = []
-        if len(sys.argv) > 1:
+        if company_name:
             # If company name provided as argument
-            company_name = sys.argv[1].lower()
             logger.info(f"Searching for company: {company_name}")
             results = searcher.main(company_name)
-        else:
+        elif company_salary_url:
             # Default to Shopify test case
             logger.info("No company specified, running Shopify test")
-            results = searcher.test_shopify_salary()
+            results = searcher.test_company_salary(company_salary_url)
+        else:
+            raise ValueError(
+                "Either company name or company salary URL must be provided"
+            )
         yield from results
     finally:
         searcher.cleanup()
@@ -681,6 +681,27 @@ def main():
 if __name__ == "__main__":
     import pprint
 
-    for i, result in enumerate(main()):
+    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Search Levels at Work")
+    parser.add_argument(
+        "--company",
+        help="Company name",
+        action="store",
+        default=None,
+    )
+    parser.add_argument(
+        "--test",
+        help="Test shopify salary page",
+        action="store_true",
+    )
+    args = parser.parse_args()
+    if args.test:
+        company_salary_url = "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
+    else:
+        company_salary_url = None
+
+    for i, result in enumerate(main(args.company, company_salary_url)):
         print(f"{i+1}:")
         pprint.pprint(result)
