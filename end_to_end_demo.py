@@ -159,6 +159,7 @@ class EmailResponder:
     def __init__(
         self, reply_rag_model: str, reply_rag_limit: int, use_cache: bool, loglevel: int
     ):
+        logger.info("Initializing EmailResponder...")
         self.reply_rag_model = reply_rag_model
         self.reply_rag_limit = reply_rag_limit
         self.use_cache = use_cache
@@ -167,14 +168,15 @@ class EmailResponder:
         self.rag = self._build_reply_rag(old_replies)
         self.email_client = email_client.GmailRepliesSearcher()
         self.email_client.authenticate()
-
+        logger.info("...EmailResponder initialized")
     def _build_reply_rag(
         self, old_messages: list[tuple[str, str, str]]
     ) -> RecruitmentRAG:  # Set up the RAG pipeline
+        logger.info("Building RAG...")
         rag = RecruitmentRAG(old_messages, loglevel=self.loglevel)
         rag.prepare_data(clear_existing=not self.use_cache)
         rag.setup_chain(llm_type=self.reply_rag_model)
-        logger.info(f"RAG setup complete")
+        logger.info(f"...RAG setup complete")
         return rag
 
     def load_previous_replies_to_recruiters(self) -> list[tuple[str, str, str]]:
@@ -199,14 +201,19 @@ class EmailResponder:
         return old_replies
 
     def generate_reply(self, msg: str) -> str:
-        return self.rag.generate_reply(msg)
+        logger.info("Generating reply...")
+        result = self.rag.generate_reply(msg)
+        logger.info("Reply generated")
+        return result
 
     def get_new_recruiter_messages(
         self, max_results: int = 100
     ) -> list[tuple[str, str, str]]:
-        messsage_dicts = self.email_client.get_new_recruiter_messages(
+        logger.info(f"Getting {max_results} new recruiter messages")
+        message_dicts = self.email_client.get_new_recruiter_messages(
             max_results=max_results
         )
+        logger.debug(f" Email client got {len(message_dicts)} new recruiter messages")
         # TODO: Move this to email_client.py
         # TODO: optionally cache it
         # TODO: solve for linkedin's failure to thread emails from DMs
@@ -214,7 +221,7 @@ class EmailResponder:
 
         # Combine messages in each thread
         content_by_thread = defaultdict(list)
-        for msg in messsage_dicts:
+        for msg in message_dicts:
             thread_id = msg["threadId"]
             content = self.email_client.extract_message_content(msg)
             content = self.email_client.clean_quoted_text(content)
@@ -235,16 +242,17 @@ class EmailResponder:
             combined_msg["combined_content"] = "\n\n".join(combined_content)
             combined_messages.append(combined_msg)
 
-        logger.info(
-            f"Got {len(messsage_dicts)} new recruiter messages in {len(combined_messages)} threads"
-        )
         combined_messages.sort(key=lambda x: int(x["internalDate"]), reverse=True)
+        logger.info(
+            f"Got {len(message_dicts)} new recruiter messages in {len(combined_messages)} threads"
+        )
         return combined_messages
 
 
 def add_company_to_spreadsheet(
     company_info: CompaniesSheetRow, args: argparse.Namespace
 ):
+    logger.info(f"Adding company to spreadsheet: {company_info.name}")
     if args.sheet == "test":
         config = companies_spreadsheet.TestConfig
     else:
@@ -257,6 +265,7 @@ def add_company_to_spreadsheet(
 
     # TODO: Check if the company already exists in the sheet, and update instead of appending
     client.append_rows([company_info.as_list_of_str()])
+    logger.info(f"Added company to spreadsheet: {company_info.name}")
 
 
 def main(args, loglevel: int = logging.INFO):
@@ -266,7 +275,6 @@ def main(args, loglevel: int = logging.INFO):
         use_cache=not args.no_cache,
         loglevel=loglevel,
     )
-
     if args.test_messages:
         new_recruiter_email = [
             {"combined_content": msg, "internalDate": "0"} for msg in args.test_messages
@@ -276,8 +284,8 @@ def main(args, loglevel: int = logging.INFO):
             max_results=args.limit
         )
 
-    for msg in new_recruiter_email:
-        # Log the subject
+    for i, msg in enumerate(new_recruiter_email):
+        logger.info(f"Processing message {i+1} of {len(new_recruiter_email)}...")
         content = msg.get("combined_content").strip()
         if not content:
             logger.warning("Empty message, skipping")
@@ -290,9 +298,9 @@ def main(args, loglevel: int = logging.INFO):
         company_info = initial_research_company(
             content, model=args.model, use_cache=not args.no_cache
         )
-        logger.info(f"Company info: {company_info}\n\n")
+        logger.debug(f"Company info after initial research: {company_info}\n\n")
         reply = email_responder.generate_reply(content)
-        logger.info(f"------ GENERATED REPLY:\n{reply}\n\n")
+        logger.info(f"------ GENERATED REPLY:\n{reply[:400]}\n\n")
         if is_good_fit(company_info):
             company_info = followup_research_company(company_info)
 
@@ -300,6 +308,7 @@ def main(args, loglevel: int = logging.INFO):
         send_reply(reply)
         archive_message(msg)
         add_company_to_spreadsheet(company_info, args)
+        logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
 
 
 if __name__ == "__main__":
@@ -369,12 +378,17 @@ if __name__ == "__main__":
         help="Use the test or production spreadsheet",
     )
     args = parser.parse_args()
-    loglevel = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=loglevel)
+
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO)
+        logger.setLevel(logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.WARNING)
+        logger.setLevel(logging.INFO)
 
     # Clear all cache if requested (do this before any other operations)
     if args.clear_all_cache:
         logger.info("Clearing all cache...")
         cache.clear()
 
-    main(args, loglevel=loglevel)
+    main(args, loglevel=logger.level)
