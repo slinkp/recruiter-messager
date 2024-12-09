@@ -13,6 +13,7 @@ from functools import wraps
 from enum import Enum, auto
 from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
 import companies_spreadsheet
+import decimal
 
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,43 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
     # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
     #   and pass that to company_researcher.py too
     # - use levels_searcher.py to find salary data
+    import levels_searcher
+
+    now = datetime.datetime.now()
+    logger.info("Firing up levels searcher ...")
+    salary_data = list(levels_searcher.main(company_name=row.name))
+    delta = datetime.datetime.now() - now
+    logger.info(
+        f"Got {len(salary_data)} rows of salary data for {row.name} in {delta.seconds} seconds"
+    )
+
+    if salary_data:
+        # Calculate averages from all salary entries.
+        # TODO: We don't actually want an average, we want the best fit.
+        total_comps = [entry["total_comp"] for entry in salary_data]
+        base_salaries = [entry["salary"] for entry in salary_data if entry["salary"]]
+        equities = [entry["equity"] for entry in salary_data if entry["equity"]]
+        bonuses = [entry["bonus"] for entry in salary_data if entry["bonus"]]
+
+        row.total_comp = (
+            decimal.Decimal(int(sum(total_comps) / len(total_comps)))
+            if total_comps
+            else None
+        )
+        row.base = (
+            decimal.Decimal(int(sum(base_salaries) / len(base_salaries)))
+            if base_salaries
+            else None
+        )
+        row.rsu = (
+            decimal.Decimal(int(sum(equities) / len(equities))) if equities else None
+        )
+        row.bonus = (
+            decimal.Decimal(int(sum(bonuses) / len(bonuses))) if bonuses else None
+        )
+    else:
+        logger.warning(f"No salary data found for {row.name}")
+
     # - Enhance the response with whether the company is a good fit for me
     # - Add the research to the RAG context for email generation
     return row
