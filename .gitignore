@@ -4,3 +4,5 @@ processed_messages.json
 data/*
 .langchain-cache.db
 credentials.json
+token.json
+.cache
