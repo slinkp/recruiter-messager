@@ -107,7 +107,11 @@ class LevelsFyiSearcher:
         # Find the level container div
         level_container = self.page.locator("#levelContainer").first
         if not level_container.is_visible(timeout=5000):
-            raise RuntimeError("Could not find level container")
+            self.page.screenshot(path="level_container_not_visible.png")
+            logger.error(f"No level container. Current URL: {self.page.url}")
+            raise RuntimeError(
+                "Could not find level container. Check screenshot level_container_not_visible.png"
+            )
 
         # Find both company columns
         company_cols = level_container.locator(".level-col").all()
@@ -129,11 +133,15 @@ class LevelsFyiSearcher:
             if style and "height:" in style:
                 # Extract height value (could be in % or px)
                 height_part = [p for p in style.split(";") if "height:" in p][0]
-                height = height_part.split("height:")[1].strip()
+                height_str = height_part.split("height:")[1].strip()
+                if height_str.endswith("%"):
+                    height = float(height_str.rstrip("%"))
 
             rows = table.locator("tr.position-row").all()
 
             levels = []
+            table_height_pixels = 0
+            cumulative_height = 0
             for row in rows:
                 # Get all span elements in the row
                 spans = row.locator("span.span-f").all()
@@ -150,19 +158,70 @@ class LevelsFyiSearcher:
                 if row_style and "height:" in row_style:
                     # Extract height value (in px)
                     height_part = [p for p in row_style.split(";") if "height:" in p][0]
-                    row_height = height_part.split("height:")[1].strip()
+                    height_str = height_part.split("height:")[1].strip()
+                    if height_str.endswith("px"):
+                        row_height = float(height_str.rstrip("px"))
+                        table_height_pixels += row_height
 
-                levels.append(
-                    {
-                        "level": level_title,
-                        "role": role_description,
-                        "row_height": row_height,
-                    }
-                )
+                # Track distance from top of table to this row
+                if row_height is not None:
+                    if level_title == "L7":
+                        logger.info(
+                            f"Found L7 row at {cumulative_height}px from table top"
+                        )
+                    levels.append(
+                        {
+                            "level": level_title,
+                            "role": role_description,
+                            "row_height": row_height,
+                            "distance_from_top": cumulative_height,
+                        }
+                    )
+                    cumulative_height += row_height
+                else:
+                    levels.append(
+                        {
+                            "level": level_title,
+                            "role": role_description,
+                            "row_height": row_height,
+                            "distance_from_top": None,
+                        }
+                    )
 
             results.append(
-                {"company": company_name, "levels": levels, "table_height": height}
+                {
+                    "company": company_name,
+                    "levels": levels,
+                    "table_height_percentage": height,
+                    "table_height_pixels": table_height_pixels,
+                }
             )
+
+        # Find L7 position in second table
+        shopify_data = results[1] if results[1]["company"] == "Shopify" else results[0]
+        l7_data = next(
+            (level for level in shopify_data["levels"] if level["level"] == "L7"), None
+        )
+
+        if l7_data:
+            l7_start = l7_data["distance_from_top"]
+            l7_end = l7_start + l7_data["row_height"]
+            logger.info(f"L7 spans from {l7_start}px to {l7_end}px")
+
+            # Find overlapping rows in first table
+            first_company = results[0]
+            overlapping_levels = []
+            for level in first_company["levels"]:
+                level_start = level["distance_from_top"]
+                level_end = level_start + level["row_height"]
+
+                # Check for overlap
+                if level_start <= l7_end and level_end >= l7_start:
+                    overlapping_levels.append(level["level"])
+
+            logger.info(f"Levels overlapping with L7: {overlapping_levels}")
+            # Add overlapping levels to results
+            results.append({"l7_overlaps": overlapping_levels})
 
         return results
 
