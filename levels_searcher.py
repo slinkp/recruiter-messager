@@ -73,6 +73,12 @@ class LevelsFyiSearcher:
 
         return self.find_and_extract_salaries()
 
+    def test_levels_extraction(self, company_name: str):
+        """Test method that extracts levels from the company comparison page"""
+        url = f"https://www.levels.fyi/?compare={company_name},Shopify&track=Software%20Engineer"
+        self.page.goto(url)
+        return self.find_and_extract_levels()
+
     def cleanup(self) -> None:
         """Clean up browser resources"""
         try:
@@ -93,6 +99,72 @@ class LevelsFyiSearcher:
         self._navigate_to_salary_page()
         searcher = SalarySearcher(self.page)
         return searcher.get_salary_data()
+
+    def find_and_extract_levels(self):
+        """Extract job level information from the comparison tables."""
+        logger.info("Extracting job level information...")
+
+        # Find the level container div
+        level_container = self.page.locator("#levelContainer").first
+        if not level_container.is_visible(timeout=5000):
+            raise RuntimeError("Could not find level container")
+
+        # Find both company columns
+        company_cols = level_container.locator(".level-col").all()
+        if len(company_cols) != 2:
+            raise RuntimeError(f"Expected 2 company columns, found {len(company_cols)}")
+
+        results = []
+        for col in company_cols:
+            # Get company name from the button
+            company_button = col.locator(".company-detail-button").first
+            company_name = company_button.get_attribute("company-name")
+
+            # Find the table and get all rows
+            table = col.locator(".levelTable").first
+
+            # Extract table height from style attribute
+            style = table.get_attribute("style")
+            height = None
+            if style and "height:" in style:
+                # Extract height value (could be in % or px)
+                height_part = [p for p in style.split(";") if "height:" in p][0]
+                height = height_part.split("height:")[1].strip()
+
+            rows = table.locator("tr.position-row").all()
+
+            levels = []
+            for row in rows:
+                # Get all span elements in the row
+                spans = row.locator("span.span-f").all()
+
+                # First span is always the level/title
+                level_title = spans[0].inner_text()
+
+                # Second span (if exists) is the role description
+                role_description = spans[1].inner_text() if len(spans) > 1 else None
+
+                # Extract row height from style attribute
+                row_style = row.get_attribute("style")
+                row_height = None
+                if row_style and "height:" in row_style:
+                    # Extract height value (in px)
+                    height_part = [p for p in row_style.split(";") if "height:" in p][0]
+                    row_height = height_part.split("height:")[1].strip()
+
+                levels.append(
+                    {
+                        "level": level_title,
+                        "role": role_description,
+                        "row_height": row_height,
+                    }
+                )
+
+            results.append(
+                {"company": company_name, "levels": levels, "table_height": height}
+            )
+
+        return results
 
     def check_login_status(self) -> bool:
         """Check if we're logged in"""
@@ -703,8 +775,21 @@ if __name__ == "__main__":
         help="Test shopify salary page",
         action="store_true",
     )
+
+    parser.add_argument(
+        "--test-levels-extraction",
+        help="Find and extract levels comparing Shopify to named company",
+        action="store_true",
+    )
+
     args = parser.parse_args()
-    if args.test:
+    if args.test_levels_extraction:
+        assert args.company, "Company name must be provided for levels extraction"
+        searcher = LevelsFyiSearcher()
+        result = searcher.test_levels_extraction(args.company)
+        pprint.pprint(result)
+        sys.exit(0)
+    elif args.test:
         company_salary_url = "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
     else:
         company_salary_url = None
