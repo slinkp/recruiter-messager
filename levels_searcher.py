@@ -274,6 +274,11 @@ class LevelsFyiSearcher:
         except Exception as e:
             logger.error(f"Error during company search: {e}")
             logger.error(f"Current URL when error occurred: {self.page.url}")
+            # TODO:
+            # Create an exception class that includes url and error message,
+            # and in main() catch that exception and save the screenshot
+            # before raising it again.
+            # Then we can DRY all the places we are screenshotting.
             try:
                 logger.info("Attempting to save error screenshot...")
                 self.page.screenshot(path="search_error.png")
