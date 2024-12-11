@@ -685,7 +685,7 @@ class LevelsExtractor:
     def __init__(self, page):
         self.page = page
 
-    def find_and_extract_levels(self) -> List[Dict]:
+    def find_and_extract_levels(self) -> List[str]:
         """Extract job level information from the comparison tables."""
         logger.info("Extracting job level information...")
 
@@ -788,6 +788,8 @@ class LevelsExtractor:
             (level for level in shopify_data["levels"] if level["level"] == "L7"), None
         )
 
+        relevant_levels = []
+
         if l7_data:
             l7_start = l7_data["distance_from_top"]
             l7_end = l7_start + l7_data["row_height"]
@@ -795,40 +797,43 @@ class LevelsExtractor:
 
             # Find overlapping rows in first table
             first_company = results[0]
-            overlapping_levels = []
             for level in first_company["levels"]:
                 level_start = level["distance_from_top"]
                 level_end = level_start + level["row_height"]
 
                 # Check for overlap
                 if level_start <= l7_end and level_end >= l7_start:
-                    overlapping_levels.append(level["level"])
+                    relevant_levels.append(level["level"])
 
-            logger.info(f"Levels overlapping with L7: {overlapping_levels}")
-            # Add overlapping levels to results
-            results.append({"l7_overlaps": overlapping_levels})
+            logger.info(f"Levels overlapping with L7: {relevant_levels}")
 
-        return results
+        return relevant_levels
 
 
 def main(company_name: str = "", company_salary_url: str = ""):
-    # TODO: add levels extraction
     searcher = LevelsFyiSearcher()
     try:
-        results = []
         if company_name:
             # If company name provided as argument
             logger.info(f"Searching for company: {company_name}")
-            results = searcher.main(company_name)
+            # Convert generator to list before cleanup
+            results = list(searcher.main(company_name))
         elif company_salary_url:
-            # Default to Shopify test case
-            logger.info("No company specified, running Shopify test")
-            results = searcher.test_company_salary(company_salary_url)
+            logger.info("Directly extracting salaries from url")
+            results = list(searcher.test_company_salary(company_salary_url))
         else:
             raise ValueError(
                 "Either company name or company salary URL must be provided"
             )
-        yield from results
+        return results
+    finally:
+        searcher.cleanup()
+
+
+def extract_levels(company_name: str):
+    searcher = LevelsFyiSearcher()
+    try:
+        return searcher.find_and_extract_levels(company_name)
     finally:
         searcher.cleanup()
 
@@ -861,8 +866,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.test_levels_extraction:
         assert args.company, "Company name must be provided for levels extraction"
-        searcher = LevelsFyiSearcher()
-        result = searcher.find_and_extract_levels(args.company)
+        result = extract_levels(args.company)
         pprint.pprint(result)
         sys.exit(0)
     elif args.test:

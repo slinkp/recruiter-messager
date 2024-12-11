@@ -85,6 +85,8 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
     now = datetime.datetime.now()
     logger.info("Firing up levels searcher ...")
     # TODO: handle case of company not found
+
+    # equivalent_levels = list(levels_searcher.extract_levels(company_name=row.name))
     salary_data = list(levels_searcher.main(company_name=row.name))
     delta = datetime.datetime.now() - now
     logger.info(
