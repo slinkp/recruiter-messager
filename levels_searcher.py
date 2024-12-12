@@ -436,7 +436,12 @@ class SalarySearcher:
         #  'total_comp': '$236,000'}
         salary, equity, bonus = data["breakdown"].split(" | ")
         salary = 0 if salary == "N/A" else float(salary.rstrip("K")) * 1000
-        equity = 0 if equity == "N/A" else float(equity.rstrip("K")) * 1000
+        if equity.endswith("K"):
+            equity = float(equity.rstrip("K")) * 1000
+        elif equity.endswith("M"):
+            equity = float(equity.rstrip("M")) * 1000000
+        else:
+            equity = 0
         bonus = 0 if bonus == "N/A" else float(bonus.rstrip("K")) * 1000
         tc = int(data["total_comp"].replace("$", "").replace(",", ""))
 
