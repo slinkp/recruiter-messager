@@ -85,17 +85,91 @@ class LinkedInSearcher:
         """
         connections = []
         try:
-            # Navigate to network-filtered search
+            # Navigate to network-filtered search (starting with just network filter)
             search_url = (
                 "https://www.linkedin.com/search/results/people/"
-                f"?currentCompany=[%22{company}%22]"
-                "&network=[%22F%22]"  # F = 1st degree connections
+                "?network=[%22F%22]"  # F = 1st degree connections
                 "&origin=FACETED_SEARCH"
             )
             self.page.goto(search_url)
+            self._wait()
 
-            # Wait for results or "no results" message
-            self.page.wait_for_selector('div[class*="search-results__container"]')
+            # Click the Current company filter button
+            self.page.get_by_role("button", name="Current company filter").click()
+            self._wait()
+
+            # Get the company search input and interact with it
+            self.page.screenshot(
+                path=f"debug_company_filter_before_entering_company_name_{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
+            company_input = self.page.get_by_placeholder("Add a company")
+            company_input.fill(company)
+            company_input.press("Enter")
+            self._wait()
+            self.page.screenshot(
+                path=f"debug_company_filter_after_entering_company_name_{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
+
+            # Find the company in the dropdown and click it
+            company_option = self.page.locator(
+                f"text='{company}' >> nth=0"  # Get the first matching Shopify option
+            ).click()
+            self._wait()
+            self.page.screenshot(
+                path=f"debug_company_filter_after_clicking_first_option_{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
+
+            # Now we should see the checkbox list
+            # Find and click the checkbox
+            company_item = self.page.locator(
+                f"label.search-reusables__value-label:has-text('{company}')"
+            )
+            input_id = company_item.get_attribute("for")
+            company_id = input_id.replace("currentCompany-", "") if input_id else None
+
+            # Click the checkbox for this company
+            self.page.locator(f"#currentCompany-{company_id}").click()
+            self._wait()
+            self.page.screenshot(
+                path=f"debug_company_filter_after_clicking_checkbox_{company_id}{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
+
+            # Click "Show results" button
+            self.page.locator("button.artdeco-button--primary").click()
+            self._wait()
+
+            # Take screenshot after navigation
+            self.page.screenshot(
+                path=f"debug_post_show_results_{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
+
+            # Take screenshot after waiting
+            self.page.screenshot(
+                path=f"debug_post_wait_{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
+
+            try:
+                # First wait for any search results container or no results message
+                self.page.wait_for_selector(
+                    'div[class*="search-results__container"], div[class*="search-results-zero-state"]',
+                    timeout=30000,
+                )
+            except PlaywrightTimeout:
+                # Take screenshot when selector times out
+                self.page.screenshot(
+                    path=f"debug_selector_timeout_{datetime.now():%Y%m%d_%H%M%S}.png"
+                )
+                # Also capture page content for debugging
+                with open(
+                    f"debug_page_content_{datetime.now():%Y%m%d_%H%M%S}.html", "w"
+                ) as f:
+                    f.write(self.page.content())
+                raise
+
+            # Take screenshot after successful selector wait
+            self.page.screenshot(
+                path=f"debug_post_selector_{datetime.now():%Y%m%d_%H%M%S}.png"
+            )
 
             # Check for no results first
             no_results = self.page.get_by_text("No results found")
