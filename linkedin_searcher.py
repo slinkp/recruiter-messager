@@ -21,11 +21,31 @@ class LinkedInSearcher:
             raise ValueError("LinkedIn credentials not found in environment")
 
         playwright = sync_playwright().start()
-        self.browser = playwright.firefox.launch(
-            headless=False,  # Helpful for development
+
+        # Define path for persistent context
+        user_data_dir = os.path.abspath("./playwright-linkedin-chrome")
+
+        self.context = playwright.chromium.launch_persistent_context(
+            user_data_dir=user_data_dir,
+            headless=False,
+            channel="chrome",  # Use regular Chrome instead of Chromium
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--enable-sandbox",
+            ],
+            ignore_default_args=["--enable-automation", "--no-sandbox"],
         )
-        self.context = self.browser.new_context()
         self.page = self.context.new_page()
+
+        # Add webdriver detection bypass
+        self.page.add_init_script(
+            """
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """
+        )
 
         self.delay = 1  # seconds between actions
 
@@ -214,8 +234,6 @@ class LinkedInSearcher:
         try:
             if self.context:
                 self.context.close()
-            if self.browser:
-                self.browser.close()
         except Exception as e:
             print(f"Error during cleanup: {e}")
 
