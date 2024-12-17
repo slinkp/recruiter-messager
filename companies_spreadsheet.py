@@ -209,7 +209,8 @@ class CompaniesSheetRow(BaseSheetRow):
 
     end_date: Optional[datetime.date] = Field(default=None)
 
-    referral: Optional[bool] = Field(default=None)
+    maybe_referrals: Optional[str] = Field(default=None)
+    referral_name: Optional[str] = Field(default=None)
     recruit_contact: Optional[str] = Field(default=None)
 
     total_comp: Optional[decimal.Decimal] = Field(default=None)
