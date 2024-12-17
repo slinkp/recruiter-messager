@@ -14,6 +14,7 @@ from enum import Enum, auto
 from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
 import companies_spreadsheet
 import decimal
+import linkedin_searcher
 
 
 logger = logging.getLogger(__name__)
@@ -127,16 +128,18 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
 
 @disk_cache(CacheStep.FOLLOWUP_RESEARCH)
 def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheetRow:
-    # TODO: Implement this:
-    # - use linkedin_searcher.py to find contacts
-    # - Store those somewhere.  Where? Spreadsheet - update existing row?
     logger.info(f"Doing followup research on: {company_info}")
+
+    linkedin_contacts = linkedin_searcher.main(company_info.name)[:4]
+    company_info.maybe_referrals = "\n".join(
+        [f"{c['name']} - {c['title']}" for c in linkedin_contacts]
+    )
     return company_info
 
 
 def is_good_fit(company_info: CompaniesSheetRow) -> bool:
     # TODO: basic heuristic for now
-    return False
+    return True
 
 
 def send_reply(reply: str):
