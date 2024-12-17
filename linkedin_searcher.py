@@ -56,12 +56,25 @@ class LinkedInSearcher:
     def login(self) -> None:
         """Login to LinkedIn with 2FA handling"""
         try:
-            self.page.goto("https://www.linkedin.com/login")
+            # First check if we're already logged in
+            self.page.goto("https://www.linkedin.com/feed/")
+            self._wait()
+            try:
+                # If we can access the feed within 3 seconds, we're already logged in
+                self.page.wait_for_url("https://www.linkedin.com/feed/", timeout=3000)
+                print("Already logged in!")
+                return
+            except PlaywrightTimeout:
+                # Not logged in, proceed with login process
+                pass
 
+            self.page.goto("https://www.linkedin.com/login")
+            self._wait()
             # Fill login form
             self.page.get_by_label("Email or Phone").fill(self.email)
+            self._wait()
             self.page.get_by_label("Password").fill(self.password)
-
+            self._wait()
             # Click sign in
             self.page.locator(
                 "button[type='submit'][data-litms-control-urn='login-submit']"
@@ -72,13 +85,12 @@ class LinkedInSearcher:
             # Try to detect 2FA page
             try:
                 # Look for common 2FA elements using role-based selectors
-                self.page.wait_for_selector("input[name='pin']", timeout=5000)
+                self.page.wait_for_selector("input[name='pin']", timeout=6000)
                 print("2FA required - Please enter code from your authenticator app...")
 
                 # Wait for successful login after 2FA
                 # Give plenty of time to enter the code
                 self.page.wait_for_url("https://www.linkedin.com/feed/", timeout=30000)
-                # self.page.wait_for_selector("div.feed-identity-module", timeout=60000)
                 print("Login successful!")
 
             except PlaywrightTimeout:
