@@ -49,9 +49,9 @@ class LinkedInSearcher:
 
         self.delay = 1  # seconds between actions
 
-    def _wait(self):
+    def _wait(self, delay: float | int = 0):
         """Add random delay between actions"""
-        time.sleep(self.delay + random.random())
+        time.sleep(delay or (self.delay + random.random()))
 
     def login(self) -> None:
         """Login to LinkedIn with 2FA handling"""
