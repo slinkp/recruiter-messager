@@ -212,16 +212,14 @@ class LinkedInSearcher:
                     connection = {
                         "name": result.get_by_role("link").first.inner_text(),
                         "title": result.locator(
-                            '[class*="entity-result__primary-subtitle"]'
-                        ).inner_text(),
-                        "location": result.locator(
-                            '[class*="entity-result__secondary-subtitle"]'
-                        ).inner_text(),
+                            "div.t-black.t-normal"
+                        ).first.inner_text(),
                         "profile_url": result.get_by_role("link").first.get_attribute(
                             "href"
                         ),
                     }
                     connections.append(connection)
+                    print(f"Found connection: {connection['name']}")
                 except Exception as e:
                     print(f"Error parsing result {i}: {e}")
                     with open(
