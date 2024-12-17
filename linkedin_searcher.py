@@ -129,67 +129,60 @@ class LinkedInSearcher:
             # Click the Current company filter button
             self.page.get_by_role("button", name="Current company filter").click()
             self._wait()
-
-            # Get the company search input and interact with it
             self.page.screenshot(
-                path=f"debug_company_filter_before_entering_company_name_{datetime.now():%Y%m%d_%H%M%S}.png"
+                path=f"debug_after_clicking_company_filter_{datetime.now():%Y%m%d_%H%M%S}.png"
             )
+
+            # Enter company name and wait for dropdown
             company_input = self.page.get_by_placeholder("Add a company")
             company_input.fill(company)
             company_input.press("Enter")
             self._wait()
             self.page.screenshot(
-                path=f"debug_company_filter_after_entering_company_name_{datetime.now():%Y%m%d_%H%M%S}.png"
+                path=f"debug_after_entering_company_{datetime.now():%Y%m%d_%H%M%S}.png"
             )
 
-            # Find the company in the dropdown and click it
-            company_option = self.page.locator(
-                f"text='{company}' >> nth=0"  # Get the first matching Shopify option
-            ).click()
+            # Wait for and click the Shopify option
+            company_option = (
+                self.page.locator("div[role='option']")
+                .filter(has_text="Shopify")
+                .filter(has_text="Company • Software Development")
+                .first
+            )
+            show_results = self.page.get_by_role("button", name="Show results").first
+
+            print("Waiting for company option and Show results to be visible...")
+            company_option.wait_for(state="visible", timeout=5000)
+            company_option.click()
             self._wait()
             self.page.screenshot(
-                path=f"debug_company_filter_after_clicking_first_option_{datetime.now():%Y%m%d_%H%M%S}.png"
+                path=f"debug_after_clicking_company_option_{datetime.now():%Y%m%d_%H%M%S}.png"
             )
 
-            # Now we should see the checkbox list
-            # Find and click the checkbox
-            company_item = self.page.locator(
-                f"label.search-reusables__value-label:has-text('{company}')"
-            )
-            input_id = company_item.get_attribute("for")
-            company_id = input_id.replace("currentCompany-", "") if input_id else None
+            show_results.wait_for(state="visible", timeout=5000)
 
-            # Click the checkbox for this company
-            self.page.locator(f"#currentCompany-{company_id}").click()
-            self._wait()
-            self.page.screenshot(
-                path=f"debug_company_filter_after_clicking_checkbox_{company_id}{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
-
-            # Click "Show results" button
-            self.page.locator("button.artdeco-button--primary").click()
+            # Click Show results directly (it should use the currently highlighted option)
+            print("Clicking Show results button...")
+            show_results.click()
             self._wait()
 
-            # Take screenshot after navigation
             self.page.screenshot(
-                path=f"debug_post_show_results_{datetime.now():%Y%m%d_%H%M%S}.png"
+                path=f"debug_after_clicking_show_results_{datetime.now():%Y%m%d_%H%M%S}.png"
             )
 
-            # Take screenshot after waiting
-            self.page.screenshot(
-                path=f"debug_post_wait_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
-
+            print("Waiting for search results...")
             try:
-                # First wait for any search results container or no results message
-                self.page.wait_for_selector(
-                    'div[class*="search-results__container"], div[class*="search-results-zero-state"]',
-                    timeout=30000,
-                )
+                results_container = self.page.locator("div.search-results-container")
+                results_container.wait_for(state="visible", timeout=30000)
+                with open(
+                    f"debug_search_results_container_{datetime.now():%Y%m%d_%H%M%S}.html",
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    f.write(results_container.evaluate("el => el.outerHTML"))
             except PlaywrightTimeout:
-                # Take screenshot when selector times out
                 self.page.screenshot(
-                    path=f"debug_selector_timeout_{datetime.now():%Y%m%d_%H%M%S}.png"
+                    path=f"debug_search_results_timeout_{datetime.now():%Y%m%d_%H%M%S}.png"
                 )
                 # Also capture page content for debugging
                 with open(
@@ -198,9 +191,9 @@ class LinkedInSearcher:
                     f.write(self.page.content())
                 raise
 
-            # Take screenshot after successful selector wait
+            # Take screenshot after waiting
             self.page.screenshot(
-                path=f"debug_post_selector_{datetime.now():%Y%m%d_%H%M%S}.png"
+                path=f"debug_post_wait_{datetime.now():%Y%m%d_%H%M%S}.png"
             )
 
             # Check for no results first
@@ -209,8 +202,8 @@ class LinkedInSearcher:
                 print(f"No connections found at {company}")
                 return connections
 
-            # Get all result cards
-            results = self.page.locator("li.reusable-search__result-container")
+            # Get all result cards within search results container
+            results = results_container.get_by_role("list").first.locator("li")
             count = results.count()
 
             for i in range(count):
@@ -231,7 +224,13 @@ class LinkedInSearcher:
                     connections.append(connection)
                 except Exception as e:
                     print(f"Error parsing result {i}: {e}")
-                    continue
+                    with open(
+                        f"debug_result_{i}_{datetime.now():%Y%m%d_%H%M%S}.html",
+                        "w",
+                        encoding="utf-8",
+                    ) as f:
+                        f.write(result.evaluate("el => el.outerHTML"))
+                    raise
 
             return connections
 
