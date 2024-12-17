@@ -209,6 +209,19 @@ class LinkedInSearcher:
             for i in range(count):
                 result = results.nth(i)
                 try:
+                    # Skip upsell cards (they have specific classes or content)
+                    if (
+                        result.locator("div.search-result__upsell-divider").is_visible()
+                        or result.locator("text=Sales Navigator").is_visible()
+                        or result.locator("text=Try Premium").is_visible()
+                    ):
+                        print(f"Skipping upsell card at index {i}")
+                        continue
+
+                    # Skip any non-profile results
+                    if not result.get_by_role("link").first.is_visible():
+                        continue
+
                     connection = {
                         "name": result.get_by_role("link").first.inner_text(),
                         "title": result.locator(
@@ -221,14 +234,10 @@ class LinkedInSearcher:
                     connections.append(connection)
                     print(f"Found connection: {connection['name']}")
                 except Exception as e:
-                    print(f"Error parsing result {i}: {e}")
-                    with open(
-                        f"debug_result_{i}_{datetime.now():%Y%m%d_%H%M%S}.html",
-                        "w",
-                        encoding="utf-8",
-                    ) as f:
+                    dumpfile = f"debug_result_{i}_{datetime.now():%Y%m%d_%H%M%S}.html"
+                    print(f"Error parsing result {i}: {e}, writing to {dumpfile}")
+                    with open(dumpfile, "w", encoding="utf-8") as f:
                         f.write(result.evaluate("el => el.outerHTML"))
-                    raise
 
             return connections
 
