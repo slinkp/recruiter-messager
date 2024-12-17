@@ -170,11 +170,12 @@ class EmailResponder:
         self.reply_rag_limit = reply_rag_limit
         self.use_cache = use_cache
         self.loglevel = loglevel
-        old_replies = self.load_previous_replies_to_recruiters()
-        self.rag = self._build_reply_rag(old_replies)
         self.email_client = email_client.GmailRepliesSearcher()
         self.email_client.authenticate()
+        old_replies = self.load_previous_replies_to_recruiters()
+        self.rag = self._build_reply_rag(old_replies)
         logger.info("...EmailResponder initialized")
+
     def _build_reply_rag(
         self, old_messages: list[tuple[str, str, str]]
     ) -> RecruitmentRAG:  # Set up the RAG pipeline
