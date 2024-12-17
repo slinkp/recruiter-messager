@@ -12,11 +12,12 @@ import random
 
 
 class LinkedInSearcher:
-    def __init__(self):
+
+    def __init__(self, debug: bool = False):
         # Fetch credentials from environment
         self.email = os.environ.get("LINKEDIN_EMAIL")
         self.password = os.environ.get("LINKEDIN_PASSWORD")
-
+        self.debug = debug
         if not all([self.email, self.password]):
             raise ValueError("LinkedIn credentials not found in environment")
 
@@ -48,6 +49,12 @@ class LinkedInSearcher:
         )
 
         self.delay = 1  # seconds between actions
+
+    def screenshot(self, name: str):
+        if self.debug:
+            path = f"debug_{name}_{datetime.now():%Y%m%d_%H%M%S}.png"
+            print(f"Saving screenshot to {path}")
+            self.page.screenshot(path=path)
 
     def _wait(self, delay: float | int = 0):
         """Add random delay between actions"""
@@ -101,14 +108,12 @@ class LinkedInSearcher:
                     )
                     print("Login successful (no 2FA required)!")
                 except PlaywrightTimeout:
-                    self.page.screenshot(path="login_state.png")
-                    raise Exception("Failed to detect login state")
+                    self.screenshot("login_state_with_timeout")
+                    raise
 
         except Exception as e:
-            self.page.screenshot(
-                path=f"login_failure_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
-            raise Exception(f"LinkedIn login failed: {str(e)}")
+            self.screenshot("login_failure")
+            raise
 
     def search_company_connections(self, company: str) -> List[Dict]:
         """
@@ -129,23 +134,19 @@ class LinkedInSearcher:
             # Click the Current company filter button
             self.page.get_by_role("button", name="Current company filter").click()
             self._wait()
-            self.page.screenshot(
-                path=f"debug_after_clicking_company_filter_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
+            self.screenshot("after_clicking_company_filter")
 
             # Enter company name and wait for dropdown
             company_input = self.page.get_by_placeholder("Add a company")
             company_input.fill(company)
             company_input.press("Enter")
             self._wait()
-            self.page.screenshot(
-                path=f"debug_after_entering_company_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
+            self.screenshot("after_entering_company")
 
-            # Wait for and click the Shopify option
+            # Wait for and click the company name option
             company_option = (
                 self.page.locator("div[role='option']")
-                .filter(has_text="Shopify")
+                .filter(has_text=company)
                 .filter(has_text="Company • Software Development")
                 .first
             )
@@ -155,9 +156,7 @@ class LinkedInSearcher:
             company_option.wait_for(state="visible", timeout=5000)
             company_option.click()
             self._wait()
-            self.page.screenshot(
-                path=f"debug_after_clicking_company_option_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
+            self.screenshot("after_clicking_company_option")
 
             show_results.wait_for(state="visible", timeout=5000)
 
@@ -166,9 +165,7 @@ class LinkedInSearcher:
             show_results.click()
             self._wait()
 
-            self.page.screenshot(
-                path=f"debug_after_clicking_show_results_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
+            self.screenshot("after_clicking_show_results")
 
             print("Waiting for search results...")
             try:
@@ -181,9 +178,7 @@ class LinkedInSearcher:
                 ) as f:
                     f.write(results_container.evaluate("el => el.outerHTML"))
             except PlaywrightTimeout:
-                self.page.screenshot(
-                    path=f"debug_search_results_timeout_{datetime.now():%Y%m%d_%H%M%S}.png"
-                )
+                self.screenshot("search_results_timeout")
                 # Also capture page content for debugging
                 with open(
                     f"debug_page_content_{datetime.now():%Y%m%d_%H%M%S}.html", "w"
@@ -191,10 +186,7 @@ class LinkedInSearcher:
                     f.write(self.page.content())
                 raise
 
-            # Take screenshot after waiting
-            self.page.screenshot(
-                path=f"debug_post_wait_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
+            self.screenshot("post_wait")
 
             # Check for no results first
             no_results = self.page.get_by_text("No results found")
@@ -218,15 +210,16 @@ class LinkedInSearcher:
                         print(f"Skipping upsell card at index {i}")
                         continue
 
-                    # Skip any non-profile results
                     if not result.get_by_role("link").first.is_visible():
+                        print(f"Skipping non-profile result at index {i}")
                         continue
 
+                    name = result.get_by_role("link").first.inner_text()
+                    name = name.split("\n")[0]
+                    title = result.locator("div.t-black.t-normal").first.inner_text()
                     connection = {
-                        "name": result.get_by_role("link").first.inner_text(),
-                        "title": result.locator(
-                            "div.t-black.t-normal"
-                        ).first.inner_text(),
+                        "name": name,
+                        "title": title,
                         "profile_url": result.get_by_role("link").first.get_attribute(
                             "href"
                         ),
@@ -242,10 +235,8 @@ class LinkedInSearcher:
             return connections
 
         except Exception as e:
-            self.page.screenshot(
-                path=f"search_error_{datetime.now():%Y%m%d_%H%M%S}.png"
-            )
-            raise Exception(f"Error searching {company}: {e}")
+            self.screenshot("search_error")
+            raise
 
     def cleanup(self) -> None:
         """Clean up browser resources"""
@@ -256,32 +247,31 @@ class LinkedInSearcher:
             print(f"Error during cleanup: {e}")
 
 
-def main():
-    searcher = LinkedInSearcher()
+def main(company: str, debug: bool = False):
+    searcher = LinkedInSearcher(debug=debug)
     try:
         searcher.login()
 
-        # Example companies
-        companies = ["Shopify"]
+        print(f"\nSearching connections at {company}...")
+        connections = searcher.search_company_connections(company)
 
-        all_results = {}
-        for company in companies:
-            print(f"\nSearching connections at {company}...")
-            connections = searcher.search_company_connections(company)
-            all_results[company] = connections
-
-            print(f"Found {len(connections)} connections at {company}")
-            for conn in connections:
-                print(f"- {conn['name']}: {conn['title']}")
-
-        # Save results to file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        with open(f"linkedin_results_{timestamp}.json", "w") as f:
-            json.dump(all_results, f, indent=2)
-
+        print(f"Found {len(connections)} connections at {company}")
+        return connections
     finally:
         searcher.cleanup()
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "company", type=str, help="Company name to search for", default="Shopify"
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Enable debug mode screenshots"
+    )
+    args = parser.parse_args()
+    results = main(args.company, debug=args.debug)
+    for result in results:
+        print(result)
