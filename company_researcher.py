@@ -294,7 +294,10 @@ class TavilyRAGResearchAgent:
                 "unknown",
             ):
                 return
-            setattr(company_info, fieldname, content[key])
+            if fieldname in company_info.model_fields:
+                setattr(company_info, fieldname, content[key])
+            else:
+                logger.warning(f"Skipping unknown field: {fieldname}")
 
         update_field_from_key_if_present("ny_address", "nyc_office_address")
         update_field_from_key_if_present("headquarters", "headquarters_city")
