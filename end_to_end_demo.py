@@ -1,6 +1,7 @@
 from collections import defaultdict
 import os.path
 import company_researcher
+import levels_searcher
 from rag import RecruitmentRAG
 import email_client
 import datetime
@@ -87,24 +88,50 @@ def disk_cache(step: CacheStep):
     return decorator
 
 
+def process_wrapper(queue: Queue, func, args, kwargs):
+    """Helper function to run a function in a process and put its result in a queue."""
+    result = func(*args, **kwargs)
+    queue.put(result)
+
+
+def run_in_process(func, *args, **kwargs):
+    """
+    Run a function in a separate process and return its result.
+
+    Args:
+        func: The function to run
+        *args, **kwargs: Arguments to pass to the function
+
+    Returns:
+        The result of running the function
+    """
+    result_queue = Queue()
+    process = Process(target=process_wrapper, args=(result_queue, func, args, kwargs))
+    process.start()
+    process.join()
+    return result_queue.get()
+
+
 @disk_cache(CacheStep.BASIC_RESEARCH)
 def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
-    row = company_researcher.main(url_or_message=message, model=model, is_url=False)
     # TODO: Implement this:
     # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
     #   and pass that to company_researcher.py too
     # - use levels_searcher.py to find salary data
-    import levels_searcher
+    row = company_researcher.main(url_or_message=message, model=model, is_url=False)
 
     now = datetime.datetime.now()
     logger.info("Firing up levels searcher ...")
     # TODO: handle case of company not found
 
     # equivalent_levels = list(levels_searcher.extract_levels(company_name=row.name))
-    salary_data = list(levels_searcher.main(company_name=row.name))
+    salary_data = run_in_process(levels_searcher.main, company_name=row.name)
+    if salary_data:
+        salary_data = list(salary_data)  # Convert generator to list if needed
+
     delta = datetime.datetime.now() - now
     logger.info(
-        f"Got {len(salary_data)} rows of salary data for {row.name} in {delta.seconds} seconds"
+        f"Got {len(salary_data) if salary_data else 0} rows of salary data for {row.name} in {delta.seconds} seconds"
     )
 
     if salary_data:
@@ -134,36 +161,15 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
     else:
         logger.warning(f"No salary data found for {row.name}")
 
-    # - Enhance the response with whether the company is a good fit for me
-    # - Add the research to the RAG context for email generation
     return row
-
-
-def run_linkedin_search(queue: Queue, company_name: str):
-    try:
-        results = linkedin_searcher.main(company_name)
-        queue.put(results)
-    except Exception as e:
-        logger.error(f"LinkedIn search failed: {e}")
-        queue.put([])  # Return empty list on failure
 
 
 @disk_cache(CacheStep.FOLLOWUP_RESEARCH)
 def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheetRow:
     logger.info(f"Doing followup research on: {company_info}")
 
-    # Create a queue to get the result from the process
-    result_queue = Queue()
-
-    # Create and start the process
-    process = Process(
-        target=run_linkedin_search, args=(result_queue, company_info.name)
-    )
-    process.start()
-
-    # Wait for the process to complete and get results
-    process.join()
-    linkedin_contacts = result_queue.get()[:4]
+    linkedin_contacts = run_in_process(linkedin_searcher.main, company_info.name) or []
+    linkedin_contacts = linkedin_contacts[:4]
 
     company_info.maybe_referrals = "\n".join(
         [f"{c['name']} - {c['title']}" for c in linkedin_contacts]
