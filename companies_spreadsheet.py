@@ -191,8 +191,12 @@ class BaseSheetRow(BaseModel):
 
 
 class CompaniesSheetRow(BaseSheetRow):
-    # Order determines index of column in sheet!
-    # Name	Type	RC?		current state	Updated	Started	Latest step	Next step	Next step date	Latest contact	End date			Total	Base	RSU	Bonus	Vesting		Leetcode?	Sys design?	notes	Remote / hybrid / onsite?	NY eng size	Total size	Headquarters	NY where	Commute home	Commute Lynn	Notes
+    """
+    Schema for the companies spreadsheet.
+    Note, order of fields determines index of column in sheet!
+
+    Also usable as a validated data model for company info.
+    """
     name: Optional[str] = Field(default="")
     type: Optional[str] = Field(default="")
     valuation: Optional[str] = Field(default="")
@@ -292,10 +296,6 @@ def authorize() -> Credentials:
     return creds
 
 
-def parse_amount(s: str) -> decimal.Decimal:
-    return decimal.Decimal(s.replace(",", ""))
-
-
 def checksum(line: list[str]):
     import hashlib
 
@@ -311,9 +311,6 @@ class CompaniesImporter(abc.ABC):
     parsing the data, and finding new lines (that don't match prev_lines).
 
     generate_data_lines() is the entry point for this.
-
-    Subclasses will generally want to declare a list of output_column_keys,
-    and override the parse_line method to return either a dict, a Row instance or None.
     """
 
     reverse_cron = True  # Default value, can be overridden in subclasses
@@ -345,43 +342,6 @@ class CompaniesImporter(abc.ABC):
             checksum = self.checksum_finder(row)
             if checksum:
                 self.seen_checksums.add(checksum)
-
-    def load_transactions_from_file(self, account_type: str | None = None):
-        # TODO: THis is unused, do we need CSV input at all?
-        fname = "TEST.csv"  # TODO: remove
-        if fname is None:
-            return
-
-        with open(fname) as infile:
-            infile.seek(0)
-            self.process_input_buffer(
-                infile, self.out_buffer, account_type=account_type
-            )
-
-    def parse_line(
-        self, line: list[str], account_type: str | None = None
-    ) -> dict | None:
-        pass
-
-    def process_input_buffer(self, in_buffer) -> list:
-        """
-        Process lines of raw csv data, parsing each and writing to a list of lists.
-        """
-        infile = csv.reader(in_buffer, dialect="excel")
-
-        for line in infile:
-            # First skip lines that aren't transactions.
-            parsed = self.parse_line(line)
-            if parsed is None:
-                continue
-            logger.debug(f"  Parsed: {parsed}")
-            out_line = parsed.as_list_of_str()
-            logger.debug([(i, val) for i, val in enumerate(out_line)])
-            # TODO: Why would this be a list of strings instead of Rows?
-            self.out_buffer.append(out_line)
-
-        return self.out_buffer
-
 
 ##############################################################################################
 # Clients
