@@ -193,7 +193,8 @@ class TavilyRAGResearchAgent:
                 "citation_urls should always be a list of strings of URLs that contain the information above.",
                 "If any string json value other than a citation url is longer than 80 characters, write a shorter summary of the value",
                 "unless otherwise clearly specified in the prompt.",
-                "Return ONLY the valid JSON object, nothing else.",
+                "Return ONLY the valid JSON object, nothing else."
+                "Never include any explanation or elaboration before or after the JSON object.",
                 format_prompt,
             ]
         )
@@ -270,8 +271,15 @@ class TavilyRAGResearchAgent:
                 )
                 logger.debug(f"  Full prompt:\n\n {full_prompt}\n\n")
                 result = self.llm.invoke(full_prompt)
-                content = json.loads(result.content)
-                logger.debug(f"  Content returned from llm:\n\n {content}\n\n")
+                # TODO: Handle malformed JSON
+                try:
+                    content = json.loads(result.content)
+                    logger.debug(f"  Content returned from llm:\n\n {content}\n\n")
+                except Exception as e:
+                    logger.error(
+                        f"Error parsing JSON raw string:\n'{result.content}'\n"
+                    )
+                    raise
 
                 # Map the API response fields to CompaniesSheetRow fields
                 self.update_company_info_from_dict(company_info, content)
