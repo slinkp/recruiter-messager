@@ -194,9 +194,11 @@ class CompaniesSheetRow(BaseSheetRow):
     # Order determines index of column in sheet!
     # Name	Type	RC?		current state	Updated	Started	Latest step	Next step	Next step date	Latest contact	End date			Total	Base	RSU	Bonus	Vesting		Leetcode?	Sys design?	notes	Remote / hybrid / onsite?	NY eng size	Total size	Headquarters	NY where	Commute home	Commute Lynn	Notes
     name: Optional[str] = Field(default="")
-    type: Optional[str] = Field(default=None)
+    type: Optional[str] = Field(default="")
+    valuation: Optional[str] = Field(default="")
+    funding_series: Optional[str] = Field(default="")
     rc: Optional[bool] = Field(default=None)
-    url: Optional[str] = Field(default=None)
+    url: Optional[str] = Field(default="")
 
     current_state: Optional[str] = Field(default=None)  # TODO validate values
     updated: Optional[datetime.date] = Field(default=None)
@@ -708,6 +710,7 @@ class TestConfig(Config):
     # FOr testing:
     # https://docs.google.com/spreadsheets/d/1uDHheC0LnGGQfS3X7SeRGi0XM8dBwXho7bu-MfaYZpY/edit?gid=0#gid=0
     SHEET_DOC_ID = "1uDHheC0LnGGQfS3X7SeRGi0XM8dBwXho7bu-MfaYZpY"
+    TAB_1_GID = "925425851"
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

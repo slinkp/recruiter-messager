@@ -74,7 +74,7 @@ For the company at {company_info.company_identifier}, find:
 FUNDING_STATUS_FORMAT_PROMPT = """
 Return these results as a valid JSON object, with the following keys and data types:
  - public_status: string "public", "private", "private unicorn" or null
- - valuation: integer or null
+ - valuation: string or null
  - funding_series: string or null
  """
 
