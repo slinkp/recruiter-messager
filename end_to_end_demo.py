@@ -15,6 +15,7 @@ from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
 import companies_spreadsheet
 import decimal
 import linkedin_searcher
+import asyncio
 
 
 logger = logging.getLogger(__name__)
@@ -141,7 +142,36 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
 def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheetRow:
     logger.info(f"Doing followup research on: {company_info}")
 
-    linkedin_contacts = linkedin_searcher.main(company_info.name)[:4]
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+        in_async_context = True
+    except RuntimeError:
+        # No running event loop
+        in_async_context = False
+
+    if in_async_context:
+        logger.info("Running linkedin search in a thread to work around asyncio")
+        import threading
+
+        result = None
+
+        def run_linkedin_search():
+            nonlocal result
+            # Create a new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = linkedin_searcher.main(company_info.name)
+            loop.close()
+
+        thread = threading.Thread(target=run_linkedin_search)
+        thread.start()
+        thread.join()
+        linkedin_contacts = result[:4]
+    else:
+        logger.info("Running linkedin search normally, no async loop")
+        linkedin_contacts = linkedin_searcher.main(company_info.name)[:4]
+
     company_info.maybe_referrals = "\n".join(
         [f"{c['name']} - {c['title']}" for c in linkedin_contacts]
     )
