@@ -10,7 +10,7 @@ import json
 import functools
 from diskcache import Cache
 from functools import wraps
-from enum import Enum, auto
+from enum import IntEnum
 from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
 import companies_spreadsheet
 import decimal
@@ -24,54 +24,65 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 cache = Cache(os.path.join(HERE, ".cache"))
 
 
-class CacheStep(Enum):
-    RAG_CONTEXT = auto()
-    GET_MESSAGES = auto()
-    BASIC_RESEARCH = auto()
-    FOLLOWUP_RESEARCH = auto()
-    REPLY = auto()
+class CacheStep(IntEnum):
+    RAG_CONTEXT = 0
+    GET_MESSAGES = 1
+    BASIC_RESEARCH = 2
+    FOLLOWUP_RESEARCH = 3
+    REPLY = 4
 
-    def includes(self, other: "CacheStep") -> bool:
-        return other.value <= self.value
 
+class CacheSettings:
+    no_cache = False
+    clear_cache = None
+    cache_until = None
+    clear_all_cache = False
+
+    def should_cache_step(self, step: CacheStep) -> bool:
+        if self.no_cache:
+            return False
+        if self.cache_until is None:
+            return True
+        return self.cache_until >= step
+
+    def should_clear_cache(self, step: CacheStep) -> bool:
+        if self.clear_all_cache:
+            return True
+        if not self.clear_cache:
+            return False
+        return step in self.clear_cache
+
+
+# TODO: Redesign this to not be global
+cache_args = CacheSettings()
 
 def disk_cache(step: CacheStep):
     def decorator(func):
         @wraps(func)
-        def wrapper(*args, use_cache=True, clear_cache=False, **kwargs):
-            if not use_cache:
-                return func(*args, **kwargs)
+        def wrapper(*args, **kwargs):
+            use_cache = cache_args.should_cache_step(step)
+            clear_cache = cache_args.should_clear_cache(step)
 
             key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            result = None
 
             if clear_cache:
                 cache.delete(key)
 
-            result = cache.get(key)
+            if use_cache:
+                result = cache.get(key)
+
             if result is None:
                 result = func(*args, **kwargs)
+
+            if use_cache:
                 cache.set(key, result)
+
             return result
 
         return wrapper
 
     return decorator
-
-
-def should_cache_step(args, step: CacheStep) -> bool:
-    if args.no_cache:
-        return False
-    if args.cache_until is None:
-        return True
-    return args.cache_until.includes(step)
-
-
-def should_clear_cache(args, step: CacheStep) -> bool:
-    if args.clear_all_cache:
-        return True
-    if not args.clear_cache:
-        return False
-    return step in args.clear_cache
 
 
 @disk_cache(CacheStep.BASIC_RESEARCH)
@@ -162,13 +173,11 @@ def archive_message(msg: str):
 
 
 class EmailResponder:
-    def __init__(
-        self, reply_rag_model: str, reply_rag_limit: int, use_cache: bool, loglevel: int
-    ):
+
+    def __init__(self, reply_rag_model: str, reply_rag_limit: int, loglevel: int):
         logger.info("Initializing EmailResponder...")
         self.reply_rag_model = reply_rag_model
         self.reply_rag_limit = reply_rag_limit
-        self.use_cache = use_cache
         self.loglevel = loglevel
         self.email_client = email_client.GmailRepliesSearcher()
         self.email_client.authenticate()
@@ -181,29 +190,19 @@ class EmailResponder:
     ) -> RecruitmentRAG:  # Set up the RAG pipeline
         logger.info("Building RAG...")
         rag = RecruitmentRAG(old_messages, loglevel=self.loglevel)
-        rag.prepare_data(clear_existing=not self.use_cache)
+        # TODO: Granular cache control here.
+        rag.prepare_data(clear_existing=cache_args.no_cache)
         rag.setup_chain(llm_type=self.reply_rag_model)
         logger.info(f"...RAG setup complete")
         return rag
 
+    @disk_cache(CacheStep.GET_MESSAGES)
     def load_previous_replies_to_recruiters(self) -> list[tuple[str, str, str]]:
-        cachefile = os.path.join(HERE, "processed_messages.json")
-        old_replies = []
-        if self.use_cache:
-            try:
-                with open(cachefile, "r") as f:
-                    old_replies = json.load(f)
-                    logger.info(f"Loaded {len(old_replies)} old replies from cache")
-            except FileNotFoundError:
-                logger.warning("No cache found, rebuilding...")
-        if not old_replies:
-            logger.info("Fetching my previous replies from mail...")
-            old_replies = self.email_client.get_my_replies_to_recruiters(
-                max_results=self.reply_rag_limit
-            )
-            logger.info(f"Got my replies from mail: {len(old_replies)}")
-            with open(cachefile, "w") as f:
-                json.dump(old_replies, f, indent=2)
+        logger.info("Fetching my previous replies from mail...")
+        old_replies = self.email_client.get_my_replies_to_recruiters(
+            max_results=self.reply_rag_limit
+        )
+        logger.info(f"Got my replies from mail: {len(old_replies)}")
 
         return old_replies
 
@@ -213,6 +212,7 @@ class EmailResponder:
         logger.info("Reply generated")
         return result
 
+    @disk_cache(CacheStep.GET_MESSAGES)
     def get_new_recruiter_messages(
         self, max_results: int = 100
     ) -> list[tuple[str, str, str]]:
@@ -222,7 +222,6 @@ class EmailResponder:
         )
         logger.debug(f" Email client got {len(message_dicts)} new recruiter messages")
         # TODO: Move this to email_client.py
-        # TODO: optionally cache it
         # TODO: solve for linkedin's failure to thread emails from DMs
         # TODO: solve for linkedin's stupidly threading "join your network" emails from different people
 
@@ -279,7 +278,6 @@ def main(args, loglevel: int = logging.INFO):
     email_responder = EmailResponder(
         reply_rag_model=args.model,
         reply_rag_limit=args.limit,
-        use_cache=not args.no_cache,
         loglevel=loglevel,
     )
     if args.test_messages:
@@ -302,9 +300,7 @@ def main(args, loglevel: int = logging.INFO):
             f"==============================\n\nProcessing message:\n\n{content}\n"
         )
         # TODO: pass subject too?
-        company_info = initial_research_company(
-            content, model=args.model, use_cache=not args.no_cache
-        )
+        company_info = initial_research_company(content, model=args.model)
         logger.debug(f"Company info after initial research: {company_info}\n\n")
         reply = email_responder.generate_reply(content)
         logger.info(f"------ GENERATED REPLY:\n{reply[:400]}\n\n")
@@ -353,7 +349,7 @@ if __name__ == "__main__":
         "--cache-until",
         type=lambda s: CacheStep[s.upper()],
         choices=list(CacheStep),
-        help="Cache steps up to and including this step (RAG_CONTEXT, GET_MESSAGES, RESEARCH, FOLLOWUP, REPLY)",
+        help=f"Cache steps up to and including this step",
     )
 
     # Clear cache options
@@ -397,5 +393,10 @@ if __name__ == "__main__":
     if args.clear_all_cache:
         logger.info("Clearing all cache...")
         cache.clear()
+    # Update the global cache settings.
+    cache_args.clear_all_cache = args.clear_all_cache
+    cache_args.clear_cache = args.clear_cache
+    cache_args.cache_until = args.cache_until
+    cache_args.no_cache = args.no_cache
 
     main(args, loglevel=logger.level)
