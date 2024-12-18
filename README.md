@@ -72,12 +72,12 @@ people work there?" or "What's their remote/onsite work policy?")
   - [x] Extract salary data based on company name
   - [x] Extract job level comparable to Shopify staff eng
   - [x] Integrate salary with main script, add to spreadsheet
-  - [ ] Integrate level with main script, add to spreadsheet
+  - [x] Integrate level with main script, add to spreadsheet
 - [ ] Main End-to-end script: decide whether the company is a good fit, yes/no
 - [x] Company research: Find contacts in linkedin search
   - [x] Drive browser
   - [x] Search for 1st degree connections currently at company
-  - [ ] Integrate with end-to-end flow, add to spreadsheet
+  - [x] Integrate with end-to-end flow, add to spreadsheet
   - [ ] Skip if company not a good fit
 - [ ] Company research: Find contacts in recurse
   - [ ] Is there an API? Or drive browser? Is there TOS?
