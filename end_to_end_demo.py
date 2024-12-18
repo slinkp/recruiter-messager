@@ -15,7 +15,7 @@ from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
 import companies_spreadsheet
 import decimal
 import linkedin_searcher
-import asyncio
+from multiprocessing import Process, Queue
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ class CacheSettings:
 cache_args = CacheSettings()
 
 def disk_cache(step: CacheStep):
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -138,39 +139,31 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
     return row
 
 
+def run_linkedin_search(queue: Queue, company_name: str):
+    try:
+        results = linkedin_searcher.main(company_name)
+        queue.put(results)
+    except Exception as e:
+        logger.error(f"LinkedIn search failed: {e}")
+        queue.put([])  # Return empty list on failure
+
+
 @disk_cache(CacheStep.FOLLOWUP_RESEARCH)
 def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheetRow:
     logger.info(f"Doing followup research on: {company_info}")
 
-    try:
-        # Try to get the current event loop
-        loop = asyncio.get_running_loop()
-        in_async_context = True
-    except RuntimeError:
-        # No running event loop
-        in_async_context = False
+    # Create a queue to get the result from the process
+    result_queue = Queue()
 
-    if in_async_context:
-        logger.info("Running linkedin search in a thread to work around asyncio")
-        import threading
+    # Create and start the process
+    process = Process(
+        target=run_linkedin_search, args=(result_queue, company_info.name)
+    )
+    process.start()
 
-        result = None
-
-        def run_linkedin_search():
-            nonlocal result
-            # Create a new event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            result = linkedin_searcher.main(company_info.name)
-            loop.close()
-
-        thread = threading.Thread(target=run_linkedin_search)
-        thread.start()
-        thread.join()
-        linkedin_contacts = result[:4]
-    else:
-        logger.info("Running linkedin search normally, no async loop")
-        linkedin_contacts = linkedin_searcher.main(company_info.name)[:4]
+    # Wait for the process to complete and get results
+    process.join()
+    linkedin_contacts = result_queue.get()[:4]
 
     company_info.maybe_referrals = "\n".join(
         [f"{c['name']} - {c['title']}" for c in linkedin_contacts]
