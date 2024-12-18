@@ -121,10 +121,23 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
     row = company_researcher.main(url_or_message=message, model=model, is_url=False)
 
     now = datetime.datetime.now()
-    logger.info("Firing up levels searcher ...")
     # TODO: handle case of company not found
 
-    # equivalent_levels = list(levels_searcher.extract_levels(company_name=row.name))
+    logger.info("Finding equivalent job levels ...")
+    equivalent_levels = list(
+        run_in_process(levels_searcher.extract_levels, row.name) or []
+    )
+    if equivalent_levels:
+        row.level_equiv = ", ".join(equivalent_levels)
+        delta = datetime.datetime.now() - now
+        logger.info(
+            f"Found equivalent job levels: {row.level_equiv} in {delta.seconds} seconds"
+        )
+    else:
+        logger.info(f"No equivalent job levels found for {row.name}")
+
+    logger.info("Finding salary data ...")
+    now = datetime.datetime.now()
     salary_data = run_in_process(levels_searcher.main, company_name=row.name)
     if salary_data:
         salary_data = list(salary_data)  # Convert generator to list if needed
