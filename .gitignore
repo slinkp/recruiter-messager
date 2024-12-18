@@ -6,3 +6,5 @@ data/*
 credentials.json
 token.json
 .cache
+debug*html
+debug*png
