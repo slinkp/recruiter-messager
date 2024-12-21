@@ -31,19 +31,6 @@ FIRST_DATA_ROW = 2  # 0-indexed
 
 # Configure logging
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-
-
-class CustomFormatter(logging.Formatter):
-    def format(self, record):
-        if record.levelno == logging.INFO:
-            return record.getMessage()
-        return f"{record.levelname}: {record.getMessage()}"
-
-
-handler.setFormatter(CustomFormatter())
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -737,4 +724,5 @@ def main(argv: list[str]):
 
 
 if __name__ == "__main__":  # pragma: no cover
+    logging.basicConfig(level=logging.INFO)
     main(sys.argv[1:])

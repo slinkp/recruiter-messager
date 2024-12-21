@@ -1,18 +1,14 @@
-from playwright.sync_api import sync_playwright, expect
-import os
-import time
+import argparse
 import logging
-from typing import List, Dict
-from pathlib import Path
+import pprint
 import random
 import sys
+import time
+from pathlib import Path
+from typing import Dict, List
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%H:%M:%S",
-)
+from playwright.sync_api import expect, sync_playwright
+
 logger = logging.getLogger(__name__)
 
 class LevelsFyiSearcher:
@@ -844,10 +840,12 @@ def extract_levels(company_name: str):
 
 
 if __name__ == "__main__":
-    import pprint
-
-    import sys
-    import argparse
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     parser = argparse.ArgumentParser(description="Search Levels at Work")
     parser.add_argument(

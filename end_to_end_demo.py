@@ -13,6 +13,7 @@ from multiprocessing import Process, Queue
 import re
 
 from diskcache import Cache
+from colorama import Fore, Style
 
 import companies_spreadsheet
 import company_researcher
@@ -406,6 +407,52 @@ def main(args, loglevel: int = logging.INFO):
         logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
 
 
+class ColoredLogFormatter(logging.Formatter):
+    """Custom formatter that adds colors based on log level"""
+
+    COLORS = {
+        logging.DEBUG: Fore.BLUE,
+        logging.INFO: Fore.GREEN,
+        logging.WARNING: Fore.YELLOW,
+        logging.ERROR: Fore.RED,
+        logging.CRITICAL: Fore.RED + Style.BRIGHT,
+    }
+
+    def format(self, record):
+        # Add color to the level name
+        color = self.COLORS.get(record.levelno, Fore.WHITE)
+        record.levelname = f"{color}{record.levelname}{Style.RESET_ALL}"
+
+        # Add color to the module name
+        record.name = f"{Fore.CYAN}{record.name}{Style.RESET_ALL}"
+
+        return super().format(record)
+
+
+def setup_logging(args: argparse.Namespace):
+    import colorama
+
+    colorama.init()
+
+    # Create console handler with custom formatter
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(
+        ColoredLogFormatter(
+            fmt="%(asctime)s %(levelname)s %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    root_logger.addHandler(console_handler)
+
+    # Configure this module's logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -474,13 +521,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.basicConfig(level=logging.INFO)
-        logger.setLevel(logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.WARNING)
-        logger.setLevel(logging.INFO)
-
+    setup_logging(args)
     # Clear all cache if requested (do this before any other operations)
     if args.clear_all_cache:
         logger.info("Clearing all cache...")
