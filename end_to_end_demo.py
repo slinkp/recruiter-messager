@@ -125,6 +125,7 @@ def run_in_process(func, *args, **kwargs):
 
 @disk_cache(CacheStep.BASIC_RESEARCH)
 def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
+    logger.info("Starting initial research...")
     # TODO: Implement this:
     # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
     #   and pass that to company_researcher.py too
@@ -203,11 +204,13 @@ def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheet
 
 def is_good_fit(company_info: CompaniesSheetRow) -> bool:
     # TODO: basic heuristic for now
+    logger.info(f"Checking if {company_info.name} is a good fit...")
     return True
 
 
 def send_reply(reply: str):
     # TODO: Implement this
+    logger.info(f"Sending reply: {reply[:200]}...")
     pass
 
 
@@ -226,6 +229,7 @@ def maybe_edit_reply(reply: str) -> str:
         temp_path = tf.name
 
     try:
+        logger.debug(f"Opening editor {editor} on {temp_path}...")
         # Split editor command to handle arguments properly
         editor_cmd = editor.split()
 
@@ -238,7 +242,7 @@ def maybe_edit_reply(reply: str) -> str:
         # Read potentially modified content
         with open(temp_path, "r") as f:
             edited_reply = f.read()
-
+        logger.debug(f"...Editor returned {len(edited_reply)} chars")
         return edited_reply.strip()
     except subprocess.CalledProcessError as e:
         logger.error(f"Editor returned error: {e}")
@@ -253,6 +257,7 @@ def archive_message(msg: str):
     # TODO: maybe if it's a good fit, we make a new label for that company?
     # eh, probably leave that manual for now.
     # TODO: add that reply to the RAG context
+    logger.info(f"Archiving message")
     pass
 
 
@@ -369,9 +374,11 @@ def main(args, loglevel: int = logging.INFO):
             {"combined_content": msg, "internalDate": "0"} for msg in args.test_messages
         ]
     else:
+        logger.debug("Getting new recruiter messages...")
         new_recruiter_email = email_responder.get_new_recruiter_messages(
             max_results=args.limit
         )
+        logger.debug("...Got new recruiter messages")
 
     for i, msg in enumerate(new_recruiter_email):
         logger.info(f"Processing message {i+1} of {len(new_recruiter_email)}...")
