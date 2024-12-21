@@ -18,6 +18,19 @@ import decimal
 import linkedin_searcher
 from multiprocessing import Process, Queue
 
+from diskcache import Cache
+
+import companies_spreadsheet
+import company_researcher
+import email_client
+import levels_searcher
+import linkedin_searcher
+from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
+from rag import RecruitmentRAG
+
+import os
+import subprocess
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -200,10 +213,41 @@ def send_reply(reply: str):
     pass
 
 
-def maybe_edit_reply(reply: str):
-    # TODO:
-    # Leverage EDITOR similar to how git commit does
-    return reply
+def maybe_edit_reply(reply: str) -> str:
+    """
+    Open reply text in user's preferred editor for optional modification.
+    Similar to git commit message editing experience.
+    """
+
+    # Get editor from environment, defaulting to vim
+    editor = os.environ.get("EDITOR", "vim")
+
+    # Create temporary file with the reply text
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".txt", delete=False) as tf:
+        tf.write(reply)
+        temp_path = tf.name
+
+    try:
+        # Split editor command to handle arguments properly
+        editor_cmd = editor.split()
+
+        # Open editor and wait for it to close
+        result = subprocess.run(
+            editor_cmd + [temp_path],
+            check=True,
+        )
+
+        # Read potentially modified content
+        with open(temp_path, "r") as f:
+            edited_reply = f.read()
+
+        return edited_reply.strip()
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Editor returned error: {e}")
+        return reply  # Return original on error
+    finally:
+        # Clean up temporary file
+        os.unlink(temp_path)
 
 
 def archive_message(msg: str):
@@ -344,12 +388,13 @@ def main(args, loglevel: int = logging.INFO):
         # TODO: pass subject too?
         company_info = initial_research_company(content, model=args.model)
         logger.debug(f"Company info after initial research: {company_info}\n\n")
-        reply = email_responder.generate_reply(content)
-        logger.info(f"------ GENERATED REPLY:\n{reply[:400]}\n\n")
+        generated_reply = email_responder.generate_reply(content)
+        logger.info(f"------ GENERATED REPLY:\n{generated_reply[:400]}\n\n")
         if is_good_fit(company_info):
             company_info = followup_research_company(company_info)
 
-        reply = maybe_edit_reply(reply)
+        reply = maybe_edit_reply(generated_reply)
+        logger.info(f"------ EDITED REPLY:\n{reply}\n\n")
         send_reply(reply)
         archive_message(msg)
         add_company_to_spreadsheet(company_info, args)
