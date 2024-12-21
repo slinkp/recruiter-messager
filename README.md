@@ -42,12 +42,13 @@ people work there?" or "What's their remote/onsite work policy?")
 ?
   - [ ] Extract data from attachments if any (eg .doc or .pdf)
   - [ ] Extract subject from message too
-- [ ] Build a little UX allowing me to approve / edit / send replies
-    - [ ] Decide on framework for this. Could be in browser, or just command line. Streamlit?
+- [x] Build a little UX allowing me to approve / edit / send replies
+    - [x] Decide on framework for this. Could be in browser, or just command
+          line. Streamlit?
+    - [x] Chose command line
     - [ ] Features needed:
-      - [ ] Send as is
-      - [ ] Edit and send
-      - [ ] Skip
+      - [x] Edit
+      - [ ] Confirm reply or skip
 - [ ] Actually send email replies
 - [ ] Re-label replied messages (so we know they don't need looking at again)
 - [ ] Company research: general info
