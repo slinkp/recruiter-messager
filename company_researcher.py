@@ -2,31 +2,17 @@
 Leverage AI to find info about prospective company / role.
 """
 
-import json
-import os
-import logging
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import RecursiveUrlLoader
-from langchain_core.runnables import RunnablePassthrough
-from langchain_anthropic import ChatAnthropic
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.output_parsers.json import SimpleJsonOutputParser
-from typing import Optional, Literal
-from pydantic import BaseModel, Field, field_validator
 import datetime
+import json
+import logging
 import os
+from typing import Optional
 
-from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
-from langchain.agents.agent_toolkits import create_conversational_retrieval_agent
-from langchain_openai import ChatOpenAI
-from langchain_community.tools.tavily_search.tool import TavilySearchResults
-
-from tavily import TavilyClient
-
+from langchain_anthropic import ChatAnthropic
 from langchain_community.cache import SQLiteCache
 from langchain_core.globals import set_llm_cache
+from langchain_openai import ChatOpenAI
+from tavily import TavilyClient
 
 from companies_spreadsheet import CompaniesSheetRow
 

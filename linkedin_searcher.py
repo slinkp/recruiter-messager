@@ -1,11 +1,9 @@
 from playwright.sync_api import (
     sync_playwright,
-    expect,
     TimeoutError as PlaywrightTimeout,
 )
 import os
 from typing import List, Dict
-import json
 from datetime import datetime
 import time
 import random

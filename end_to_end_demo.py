@@ -1,21 +1,14 @@
-from collections import defaultdict
-import os.path
-import company_researcher
-import levels_searcher
-from rag import RecruitmentRAG
-import email_client
-import datetime
-import logging
 import argparse
-import json
-import functools
-from diskcache import Cache
-from functools import wraps
-from enum import IntEnum
-from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
-import companies_spreadsheet
+import datetime
 import decimal
-import linkedin_searcher
+import logging
+import os
+import os.path
+import subprocess
+import tempfile
+from collections import defaultdict
+from enum import IntEnum
+from functools import wraps
 from multiprocessing import Process, Queue
 
 from diskcache import Cache
@@ -27,10 +20,6 @@ import levels_searcher
 import linkedin_searcher
 from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
 from rag import RecruitmentRAG
-
-import os
-import subprocess
-import tempfile
 
 logger = logging.getLogger(__name__)
 

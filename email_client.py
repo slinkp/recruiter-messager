@@ -1,14 +1,14 @@
 import base64
+import logging
 import os
 import re
-import logging
 from typing import List, Tuple
 
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUTH_DIR = os.path.join(HERE, "secrets")

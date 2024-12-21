@@ -4,6 +4,7 @@
 import abc
 import argparse
 import csv
+import dataclasses
 import datetime
 import decimal
 import functools
@@ -11,9 +12,10 @@ import logging
 import os
 import os.path
 import sys
-from typing import Any, ClassVar, Generator, Iterator, Optional, Iterable
+from decimal import Decimal
+from typing import Any, ClassVar, Generator, Iterator, Optional
 
-# Third-party imports
+import dateutil.parser
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -26,14 +28,6 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 FIRST_DATA_ROW = 2  # 0-indexed
 
-
-import dataclasses
-import dateutil.parser
-from typing import Generator, Optional, Union, Any, ClassVar, Iterator
-import sys
-import logging
-from pydantic import BaseModel, Field, ValidationError, model_validator
-from decimal import Decimal
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -51,8 +45,8 @@ handler.setFormatter(CustomFormatter())
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
