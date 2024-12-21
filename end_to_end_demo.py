@@ -10,6 +10,7 @@ from collections import defaultdict
 from enum import IntEnum
 from functools import wraps
 from multiprocessing import Process, Queue
+import re
 
 from diskcache import Cache
 
@@ -68,7 +69,10 @@ def disk_cache(step: CacheStep):
             use_cache = cache_args.should_cache_step(step)
             clear_cache = cache_args.should_clear_cache(step)
 
-            key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            # Remove memory addresses from string representations
+            args_str = re.sub(r" at 0x[0-9a-fA-F]+", "", str(args))
+            kwargs_str = re.sub(r" at 0x[0-9a-fA-F]+", "", str(kwargs))
+            key = f"{func.__name__}:{args_str}:{kwargs_str}"
             result = None
 
             if clear_cache:
@@ -76,10 +80,15 @@ def disk_cache(step: CacheStep):
 
             if use_cache:
                 result = cache.get(key)
+                if result is None:
+                    logger.debug(f"Cache miss for {key}")
+                else:
+                    logger.debug(f"Cache hit for {key}")
 
             if result is None:
+                logger.debug(f"No cached result, running function for {key}...")
                 result = func(*args, **kwargs)
-
+                logger.debug(f"... Ran function for {key}")
             if use_cache:
                 cache.set(key, result)
 

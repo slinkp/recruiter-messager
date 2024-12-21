@@ -231,7 +231,7 @@ total comp: $167,961
 base salary: $160.8k
 stock: $7.2k
 bonus: N/A
-
+```
 
 
 # Possible future explorations: local models
@@ -259,3 +259,28 @@ to deployment")
   - You can see how much GPU and CPU memory you're using just for loading the
     model and doing a single inference
   - that'll give you a ballpark for what GPU you need to run it locally w/o optimization
+
+
+# 12/21/24 here's an example of flawed code that seems to work until you pay close enough attention
+
+Cursor spat out a `@disk_cache` decorator function that seemed pretty
+reasonable.  But the cache key looked like this:
+
+`key = f"{func.__name__}:{str(args)}:{str(kwargs)}"`
+
+This is ok for functions, but for instance methods you'll likely get a
+different cache key on every run, unless you override your class's `__str__` to
+return a consistent result.
+I discovered this when I added some logging:
+
+```
+DEBUG - Cache miss for
+load_previous_replies_to_recruiters:(<__main__.EmailResponder object at 0x107152270>,):{}
+```
+
+Cursor's idea of how to fix this was remove the first arg if the callable was
+an instancemethod. But that wouldn't help if we pass arbitrary objects as other
+args.
+I replied "Better idea; since there might be arbitrary objects as args, let's do regex replacement to remove strings like ' object at 0x107152270'"
+
+
