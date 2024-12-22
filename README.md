@@ -22,6 +22,26 @@ researching. Some of them are amenable to answering in a predictable way
 (eg on Linkedin or Levels); some take more exploratory digging (eg "How many
 people work there?" or "What's their remote/onsite work policy?")
 
+# Notes on workflow
+
+I'd like this to suit me being able to deal with a batch of possible jobs
+(whether found via email, tips from elsewhere, whatever) in a fairly natural
+way.
+Eg:
+
+- Walk up to my computer
+- Run `<the program>`
+  - See some kind of summary of status, TBD
+  - for example: "There are 9 un-responded recruiter pings from linkedin"
+- Automated research happens
+  - by default, do all un-researched companies?
+- List of results and action items
+  - "company foo via linkedin ping"
+  - actions: reply (auto w/ confirmation), defer / do nothing, archive / ignore
+
+"Defer" raises a question of state.
+Do we need some kind of db tracking status?
+(Or maybe the cache is enough)
 
 
 # Roadmap, end to end
@@ -43,6 +63,7 @@ people work there?" or "What's their remote/onsite work policy?")
   - [ ] Extract data from attachments if any (eg .doc or .pdf)
   - [ ] Extract subject from message too
 - [x] Build a little UX allowing me to approve / edit / send replies
+    - [ ] They should be batched! See "Notes on workflow"
     - [x] Decide on framework for this. Could be in browser, or just command
           line. Streamlit?
     - [x] Chose command line
