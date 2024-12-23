@@ -6,6 +6,10 @@ from pyramid.scripts.pserve import PServeCommand
 import os
 import json
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from companies_spreadsheet import CompaniesSheetRow
 
 
@@ -80,11 +84,32 @@ def home(request):
         return Response(f.read(), content_type="text/html")
 
 
+def create_stub_message(company_name: str) -> str:
+    return f"generated reply {company_name} {datetime.now().isoformat()}"
+
+
 @view_config(route_name="generate_message", renderer="json", request_method="POST")
 def generate_message(request):
     company_name = request.matchdict["company_name"]
-    # For now, just return a hardcoded message with timestamp
-    return {"message": f"generated reply {company_name} {datetime.now().isoformat()}"}
+    message = create_stub_message(company_name)
+    logger.info(f"Generated message for {company_name}: {message}")
+    return {"message": message}
+
+
+@view_config(route_name="generate_message", renderer="json", request_method="PUT")
+def update_message(request):
+    company_name = request.matchdict["company_name"]
+    try:
+        body = request.json_body
+        message = body.get("message")
+        if not message:
+            request.response.status = 400
+            return {"error": "Message is required"}
+        logger.info(f"Updated message for {company_name}: {message}")
+        return {"message": message}
+    except json.JSONDecodeError:
+        request.response.status = 400
+        return {"error": "Invalid JSON"}
 
 
 def main(global_config, **settings):
@@ -103,7 +128,7 @@ def main(global_config, **settings):
         # Routes
         config.add_route('home', '/')
         config.add_route('companies', '/api/companies')
-        config.add_route("generate_message", "/api/{company_name}/generate_message")
+        config.add_route("generate_message", "/api/{company_name}/reply_message")
         config.add_static_view(name='static', path='static')
         config.scan()
 

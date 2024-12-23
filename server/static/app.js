@@ -19,17 +19,11 @@ document.addEventListener('alpine:init', () => {
 
         async generateReply(company) {
             try {
-                const response = await fetch(`/api/${company.name}/generate_message`, {
+                const response = await fetch(`/api/${company.name}/reply_message`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: company.name }),
                 });
                 
                 const data = await response.json();
-                
-                // Update the company's reply_message in the local state
                 company.reply_message = data.message;
             } catch (err) {
                 console.error('Failed to generate reply:', err);
@@ -48,10 +42,27 @@ document.addEventListener('alpine:init', () => {
             document.getElementById('editModal').close();
         },
 
-        saveReply() {
+        async saveReply() {
             if (this.editingCompany) {
-                this.editingCompany.reply_message = this.editingReply;
-                this.cancelEdit();
+                try {
+                    const response = await fetch(`/api/${this.editingCompany.name}/reply_message`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: this.editingReply }),
+                    });
+                    
+                    const data = await response.json();
+                    if (response.ok) {
+                        this.editingCompany.reply_message = data.message;
+                        this.cancelEdit();
+                    } else {
+                        console.error('Failed to save reply:', data.error);
+                    }
+                } catch (err) {
+                    console.error('Failed to save reply:', err);
+                }
             }
         }
     }));
