@@ -14,7 +14,13 @@ details summary {
 
 dialog {
     width: 100%;
-    max-width: 60rem;
+    max-width: 80rem;
+}
+
+dialog article {
+    width: 100%;
+    max-width: none;  /* Override Pico's default max-width */
+    margin: 0;
 }
 
 dialog textarea {
