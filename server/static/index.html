@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,10 +18,19 @@
         <template x-for="company in companies" :key="company.name">
             <article>
                 <header x-text="company.name"></header>
-                <p>
-                    Type: <span x-text="company.type"></span><br>
-                    Valuation: <span x-text="company.valuation"></span>
-                </p>
+                <details>
+                    <summary>Details...</summary>
+                    <p>
+                        <template x-for="[key, value] in Object.entries(company.details)" :key="key">
+                            <template x-if="value">
+                                <span>
+                                    <span x-text="key + ': '"></span>
+                                    <span x-text="value"></span><br>
+                                </span>
+                            </template>
+                        </template>
+                    </p>
+                </details>
             </article>
         </template>
     </main>

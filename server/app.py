@@ -7,45 +7,65 @@ import os
 
 from companies_spreadsheet import CompaniesSheetRow
 
+
+class Company:
+    def __init__(
+        self, name: str, details: CompaniesSheetRow, initial_message: str | None = None
+    ):
+        self.name = name
+        self.details = details
+        self.initial_message = initial_message
+
+
 # Sample data (same as before)
 SAMPLE_COMPANIES = [
-    CompaniesSheetRow(
-        name="TechCorp AI",
-        type="Startup",
-        valuation="1B",
-        funding_series="Series B",
-        url="https://techcorp.ai",
-        current_state="Active",
-        updated=date(2024, 3, 15),
-        eng_size=50,
-        total_size=120,
-        headquarters="San Francisco",
-        remote_policy="Hybrid"
+    Company(
+        name="Shopify",
+        details=CompaniesSheetRow(
+            name="Shopify",
+            type="Public",
+            valuation="10B",
+            url="https://shopify.com",
+            current_state="Active",
+            updated=date(2024, 12, 15),
+            eng_size=4000,
+            total_size=10000,
+            headquarters="Ottawa",
+            remote_policy="Remote",
+        ),
+        initial_message="Hi Paul, are you interested in working as a staff developer at Shopify? Regards, Bobby Bobberson",
     ),
-    CompaniesSheetRow(
-        name="DataDrive Systems",
-        type="Public",
-        valuation="10B",
-        url="https://datadrive.com",
-        current_state="Active",
-        updated=date(2024, 3, 10),
-        eng_size=500,
-        total_size=2000,
-        headquarters="New York",
-        remote_policy="Remote First"
-    )
+    Company(
+        name="Rippling",
+        details=CompaniesSheetRow(
+            name="Rippling",
+            type="Private Unicorn",
+            valuation="1500M",
+            url="https://rippling.com",
+            current_state="Active",
+            updated=date(2024, 10, 10),
+            headquarters="New York",
+        ),
+        initial_message="Hi Paul! Interested in a senior backend role at Rippling? - Mark Marker",
+    ),
 ]
 
-@view_config(route_name='companies', renderer='json', request_method='GET')
-def get_companies(request):
-    companies = [
-        {
+
+def serialize_company(company: Company):
+    return {
+        "name": company.name,
+        "initial_message": company.initial_message,
+        "details": {
             k: (v.isoformat() if isinstance(v, date) else v)
-            for k, v in company.model_dump().items()
+            for k, v in company.details.model_dump().items()
             if v is not None
-        }
-        for company in SAMPLE_COMPANIES
-    ]
+        },
+    }
+
+
+@view_config(route_name="companies", renderer="json", request_method="GET")
+def get_companies(request):
+    companies = [serialize_company(company) for company in SAMPLE_COMPANIES]
     return companies
 
 
