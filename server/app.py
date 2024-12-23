@@ -5,6 +5,8 @@ from pyramid.view import view_config
 from pyramid.scripts.pserve import PServeCommand
 import os
 import json
+from pydantic import BaseModel
+from typing import Dict, List, Optional
 
 from companies_spreadsheet import CompaniesSheetRow
 
@@ -64,14 +66,46 @@ def setup_colored_logging():
 logger = logging.getLogger(__name__)
 
 
-class Company:
-    def __init__(
-        self, name: str, details: CompaniesSheetRow, initial_message: str | None = None
-    ):
-        self.name = name
-        self.details = details
-        self.initial_message = initial_message
-        self.reply_message = ""
+class Company(BaseModel):
+    name: str
+    details: CompaniesSheetRow
+    initial_message: Optional[str] = None
+    reply_message: str = ""
+
+
+class CompanyRepository:
+    def __init__(self):
+        self._companies: Dict[str, Company] = {
+            company.name: company for company in SAMPLE_COMPANIES
+        }
+
+    def get(self, name: str) -> Optional[Company]:
+        logger.info(f"Getting company {name}")
+        return self._companies.get(name)
+
+    def get_all(self) -> List[Company]:
+        logger.info(f"Getting all companies")
+        return list(self._companies.values())
+
+    def create(self, company: Company) -> Company:
+        if company.name in self._companies:
+            raise ValueError(f"Company {company.name} already exists")
+        logger.info(f"Creating and saving company {company.name}")
+        self._companies[company.name] = company
+        return company
+
+    def update(self, company: Company) -> Company:
+        if company.name not in self._companies:
+            raise ValueError(f"Company {company.name} not found")
+        logger.info(f"Updating company {company.name}")
+        self._companies[company.name] = company
+        return company
+
+    def delete(self, name: str) -> None:
+        if name not in self._companies:
+            raise ValueError(f"Company {name} not found")
+        logger.info(f"Deleting company {name}")
+        del self._companies[name]
 
 
 # Sample data (same as before)
@@ -109,22 +143,30 @@ SAMPLE_COMPANIES = [
 
 
 def serialize_company(company: Company):
-    return {
-        "name": company.name,
-        "initial_message": company.initial_message,
-        "reply_message": company.reply_message,  # Add this line
-        "details": {
-            k: (v.isoformat() if isinstance(v, date) else v)
-            for k, v in company.details.model_dump().items()
-            if v is not None
-        },
+    data = company.model_dump()
+    data["details"] = {
+        k: (v.isoformat() if isinstance(v, date) else v)
+        for k, v in company.details.model_dump().items()
+        if v is not None
     }
+    return data
+
+
+# Module-level singleton storage
+_company_repository = None
+
+
+def company_repository() -> CompanyRepository:
+    global _company_repository
+    if _company_repository is None:
+        _company_repository = CompanyRepository()
+    return _company_repository
 
 
 @view_config(route_name="companies", renderer="json", request_method="GET")
 def get_companies(request):
-    companies = [serialize_company(company) for company in SAMPLE_COMPANIES]
-    return companies
+    companies = company_repository().get_all()
+    return [serialize_company(company) for company in companies]
 
 
 @view_config(route_name="home")
@@ -156,6 +198,15 @@ def update_message(request):
         if not message:
             request.response.status = 400
             return {"error": "Message is required"}
+
+        company = company_repository().get(company_name)
+        if not company:
+            request.response.status = 404
+            return {"error": "Company not found"}
+
+        company.reply_message = message
+        company_repository().update(company)
+
         logger.info(f"Updated message for {company_name}: {message}")
         return {"message": message}
     except json.JSONDecodeError:
@@ -184,6 +235,9 @@ def main(global_config, **settings):
         config.scan()
 
         setup_colored_logging()
+
+        # Initialize repository
+        company_repository()
 
         return config.make_wsgi_app()
 
