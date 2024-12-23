@@ -66,9 +66,18 @@ Do we need some kind of db tracking status?
     - [ ] They should be batched! See "Notes on workflow"
     - [x] Decide on framework for this. Could be in browser, or just command
           line. Streamlit?
-    - [x] Chose command line
+    - [x] Chose command line for first pass
+      - [x] Edit reply        
+    - [x] Chose SPWA using Alpine.js and Pico.css for second pass
     - [ ] Features needed:
-      - [x] Edit
+      - [ ] List companies
+        - [ ] Display known data
+        - [ ] Link to original message, if any (maybe just gmail link?)
+        - [ ] "Generate reply" button (or "regenerate")
+        - [ ] Display reply
+        - [ ] "Edit reply" link
+        - [ ] "Send and archive" button
+      - [x] Edit reply
       - [ ] Confirm reply or skip
 - [ ] Actually send email replies
 - [ ] Re-label replied messages (so we know they don't need looking at again)
