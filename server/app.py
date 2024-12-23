@@ -80,5 +80,12 @@ def main(global_config, **settings):
 
 
 if __name__ == "__main__":
-    cmd = PServeCommand(["development.ini", "--reload"])
+    here = os.path.dirname(os.path.abspath(__file__))
+    config_file = os.path.join(os.path.dirname(here), "development.ini")
+    print(f"Looking for config file at: {config_file}")
+    if not os.path.exists(config_file):
+        print(f"Config file not found at {config_file}")
+    else:
+        print(f"Found config file at {config_file}")
+    cmd = PServeCommand(["pserve", config_file])
     cmd.run()
