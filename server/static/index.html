@@ -18,6 +18,15 @@
         <template x-for="company in companies" :key="company.name">
             <article>
                 <header x-text="company.name"></header>
+                <template x-if="company.initial_message && !company.reply_message">
+                    <button @click="generateReply(company)">Generate reply</button>
+                </template>
+                <template x-if="company.reply_message">
+                    <div>
+                        <button @click="editReply(company)">Edit reply</button>
+                        <button @click="generateReply(company)">Regenerate reply</button>
+                    </div>
+                </template>
                 <details>
                     <summary>Details...</summary>
                     <p>
@@ -33,6 +42,22 @@
                 </details>
             </article>
         </template>
+        
+        <!-- Modal for editing replies -->
+        <dialog id="editModal" x-show="editingCompany" x-cloak>
+            <article>
+                <header>
+                    <h3>Edit Reply</h3>
+                </header>
+                <form @submit.prevent="saveReply">
+                    <textarea x-model="editingReply" rows="5"></textarea>
+                    <footer>
+                        <button type="button" @click="cancelEdit">Cancel</button>
+                        <button type="submit">Save</button>
+                    </footer>
+                </form>
+            </article>
+        </dialog>
     </main>
 </body>
 </html>

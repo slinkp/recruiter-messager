@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 from pyramid.config import Configurator
 from pyramid.response import Response
 from pyramid.view import view_config
 from pyramid.scripts.pserve import PServeCommand
 import os
+import json
 
 from companies_spreadsheet import CompaniesSheetRow
 
@@ -15,6 +16,7 @@ class Company:
         self.name = name
         self.details = details
         self.initial_message = initial_message
+        self.reply_message = ""
 
 
 # Sample data (same as before)
@@ -55,6 +57,7 @@ def serialize_company(company: Company):
     return {
         "name": company.name,
         "initial_message": company.initial_message,
+        "reply_message": company.reply_message,  # Add this line
         "details": {
             k: (v.isoformat() if isinstance(v, date) else v)
             for k, v in company.details.model_dump().items()
@@ -77,6 +80,13 @@ def home(request):
         return Response(f.read(), content_type="text/html")
 
 
+@view_config(route_name="generate_message", renderer="json", request_method="POST")
+def generate_message(request):
+    company_name = request.matchdict["company_name"]
+    # For now, just return a hardcoded message with timestamp
+    return {"message": f"generated reply {company_name} {datetime.now().isoformat()}"}
+
+
 def main(global_config, **settings):
     with Configurator(settings=settings) as config:
         # Enable debugtoolbar for development
@@ -93,6 +103,7 @@ def main(global_config, **settings):
         # Routes
         config.add_route('home', '/')
         config.add_route('companies', '/api/companies')
+        config.add_route("generate_message", "/api/{company_name}/generate_message")
         config.add_static_view(name='static', path='static')
         config.scan()
 

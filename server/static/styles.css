@@ -1,0 +1,33 @@
+/* Reduce spacing around details element */
+details {
+    margin: 0.5rem 0;
+}
+
+/* Adjust the summary spacing if needed */
+details summary {
+    margin-bottom: 0.5rem;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+dialog {
+    width: 100%;
+    max-width: 60rem;
+}
+
+dialog textarea {
+    width: 100%;
+    margin-bottom: 1rem;
+    font-family: monospace;
+    font-size: 1rem;
+    min-height: 200px;
+    padding: 0.5rem;
+}
+
+dialog footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+} 
