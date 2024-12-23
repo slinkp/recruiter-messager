@@ -14,6 +14,7 @@ from colorama import Fore, Style
 import colorama
 
 import models
+import tasks
 
 
 class ColoredFormatter(logging.Formatter):
@@ -127,8 +128,23 @@ def research_company(request):
         request.response.status = 404
         return {"error": "Company not found"}
 
-    logger.info(f"Research requested for {company_name}")
-    return models.serialize_company(company)
+    # Create a new task
+    task_id = tasks.task_manager().create_task(company_name)
+    logger.info(f"Research requested for {company_name}, task_id: {task_id}")
+
+    return {"task_id": task_id, "status": tasks.TaskStatus.PENDING.value}
+
+
+@view_config(route_name="research_status", renderer="json", request_method="GET")
+def get_research_status(request):
+    task_id = request.matchdict["task_id"]
+    task = tasks.task_manager().get_task(task_id)
+
+    if not task:
+        request.response.status = 404
+        return {"error": "Task not found"}
+
+    return task
 
 
 def main(global_config, **settings):
@@ -149,6 +165,7 @@ def main(global_config, **settings):
         config.add_route('companies', '/api/companies')
         config.add_route("generate_message", "/api/{company_name}/reply_message")
         config.add_route("research", "/api/{company_name}/research")
+        config.add_route("research_status", "/api/research/{task_id}")
         config.add_static_view(name='static', path='static')
         config.scan()
 
