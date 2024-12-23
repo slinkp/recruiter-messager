@@ -23,8 +23,10 @@
                 </template>
                 <template x-if="company.reply_message">
                     <div>
-                        <button @click="editReply(company)">Edit reply</button>
-                        <button @click="generateReply(company)">Regenerate reply</button>
+                        <div style="display: flex; gap: 1rem;">
+                            <button @click="editReply(company)">Edit reply</button>
+                            <button @click="generateReply(company)">Regenerate reply</button>
+                        </div>
                     </div>
                 </template>
                 <details>
