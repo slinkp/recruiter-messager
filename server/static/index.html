@@ -18,6 +18,14 @@
         <template x-for="company in companies" :key="company.name">
             <article>
                 <header x-text="company.name"></header>
+                <button 
+                    @click="research(company)" 
+                    :disabled="isResearching(company)"
+                    class="research-button"
+                >
+                    <span x-text="isResearching(company) ? 'Researching...' : 'Research!'">Research!</span>
+                    <span x-show="isResearching(company)" class="loading-spinner"></span>
+                </button>
                 <template x-if="company.initial_message && !company.reply_message">
                     <button @click="generateReply(company)">Generate reply</button>
                 </template>

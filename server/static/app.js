@@ -4,6 +4,7 @@ document.addEventListener('alpine:init', () => {
         loading: false,
         editingCompany: null,
         editingReply: '',
+        researchingCompanies: new Set(),
         
         async init() {
             this.loading = true;
@@ -64,6 +65,26 @@ document.addEventListener('alpine:init', () => {
                     console.error('Failed to save reply:', err);
                 }
             }
+        },
+
+        async research(company) {
+            try {
+                this.researchingCompanies.add(company.name);
+                const response = await fetch(`/api/${company.name}/research`, {
+                    method: 'POST',
+                });
+                
+                const data = await response.json();
+                Object.assign(company, data);
+            } catch (err) {
+                console.error('Failed to research company:', err);
+            } finally {
+                this.researchingCompanies.delete(company.name);
+            }
+        },
+
+        isResearching(company) {
+            return this.researchingCompanies.has(company.name);
         }
     }));
 });

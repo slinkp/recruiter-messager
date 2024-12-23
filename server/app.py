@@ -214,6 +214,19 @@ def update_message(request):
         return {"error": "Invalid JSON"}
 
 
+@view_config(route_name="research", renderer="json", request_method="POST")
+def research_company(request):
+    company_name = request.matchdict["company_name"]
+    company = company_repository().get(company_name)
+
+    if not company:
+        request.response.status = 404
+        return {"error": "Company not found"}
+
+    logger.info(f"Research requested for {company_name}")
+    return serialize_company(company)
+
+
 def main(global_config, **settings):
     with Configurator(settings=settings) as config:
         # Enable debugtoolbar for development
@@ -231,6 +244,7 @@ def main(global_config, **settings):
         config.add_route('home', '/')
         config.add_route('companies', '/api/companies')
         config.add_route("generate_message", "/api/{company_name}/reply_message")
+        config.add_route("research", "/api/{company_name}/research")
         config.add_static_view(name='static', path='static')
         config.scan()
 
