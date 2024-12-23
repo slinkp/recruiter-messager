@@ -75,12 +75,73 @@ document.addEventListener('alpine:init', () => {
                 });
                 
                 const data = await response.json();
-                Object.assign(company, data);
+                company.research_task_id = data.task_id;
+                company.research_status = data.status;
+                
+                // Start polling for updates
+                this.pollResearchStatus(company);
             } catch (err) {
                 console.error('Failed to research company:', err);
-            } finally {
                 this.researchingCompanies.delete(company.name);
             }
+        },
+
+        async pollResearchStatus(company) {
+            while (this.researchingCompanies.has(company.name)) {
+                try {
+                    const response = await fetch(`/api/research/${company.research_task_id}`);
+                    const task = await response.json();
+                    
+                    company.research_status = task.status;
+                    
+                    if (task.status === 'completed') {
+                        // Update company with research results
+                        if (task.result) {
+                            Object.assign(company, task.result);
+                        }
+                        this.researchingCompanies.delete(company.name);
+                        break;
+                    } else if (task.status === 'failed') {
+                        company.research_error = task.error;
+                        this.researchingCompanies.delete(company.name);
+                        break;
+                    }
+                    
+                    // Wait before polling again
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (err) {
+                    console.error('Failed to poll research status:', err);
+                    this.researchingCompanies.delete(company.name);
+                    break;
+                }
+            }
+        },
+
+        getResearchStatusText(company) {
+            if (company.research_error) {
+                return `Research failed: ${company.research_error}`;
+            }
+            switch (company.research_status) {
+                case 'pending':
+                    return 'Research pending...';
+                case 'running':
+                    return 'Researching...';
+                case 'completed':
+                    return 'Research complete';
+                case 'failed':
+                    return 'Research failed';
+                default:
+                    return '';
+            }
+        },
+
+        getResearchStatusClass(company) {
+            return {
+                'status-pending': company.research_status === 'pending',
+                'status-running': company.research_status === 'running',
+                'status-completed': company.research_status === 'completed',
+                'status-failed': company.research_status === 'failed' || company.research_error
+            };
         },
 
         isResearching(company) {
