@@ -109,6 +109,21 @@ class TaskManager:
                     ),
                 )
 
+    def get_next_pending_task(self) -> Optional[tuple[str, str]]:
+        with self.lock:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT id, company_name FROM tasks 
+                    WHERE status = ? 
+                    ORDER BY created_at ASC 
+                     LIMIT 1
+                    """,
+                    (TaskStatus.PENDING.value,),
+                )
+                row = cursor.fetchone()
+        return row
+
 
 # Module-level singleton
 _task_manager = None
