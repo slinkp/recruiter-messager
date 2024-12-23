@@ -2,8 +2,7 @@ from datetime import date
 from pyramid.config import Configurator
 from pyramid.response import Response
 from pyramid.view import view_config
-from pyramid.static import static_view
-from wsgiref.simple_server import make_server
+from pyramid.scripts.pserve import PServeCommand
 import os
 
 from companies_spreadsheet import CompaniesSheetRow
@@ -57,27 +56,29 @@ def home(request):
     with open(os.path.join(here, 'static', 'index.html')) as f:
         return Response(f.read(), content_type="text/html")
 
-def main():
-    with Configurator() as config:
+
+def main(global_config, **settings):
+    with Configurator(settings=settings) as config:
+        # Enable debugtoolbar for development
+        config.include("pyramid_debugtoolbar")
+
         # Static files configuration
         here = os.path.dirname(os.path.abspath(__file__))
         static_path = os.path.join(here, 'static')
-        
+
         # Create static directory if it doesn't exist
         if not os.path.exists(static_path):
             os.makedirs(static_path)
-        
+
         # Routes
         config.add_route('home', '/')
         config.add_route('companies', '/api/companies')
         config.add_static_view(name='static', path='static')
         config.scan()
-        
-        app = config.make_wsgi_app()
-    
-    server = make_server('0.0.0.0', 8000, app)
-    print('Web server started on http://0.0.0.0:8000')
-    server.serve_forever()
 
-if __name__ == '__main__':
-    main()
+        return config.make_wsgi_app()
+
+
+if __name__ == "__main__":
+    cmd = PServeCommand(["development.ini", "--reload"])
+    cmd.run()
