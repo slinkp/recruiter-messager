@@ -6,11 +6,62 @@ from pyramid.scripts.pserve import PServeCommand
 import os
 import json
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 from companies_spreadsheet import CompaniesSheetRow
+
+import logging
+from colorama import Fore, Style
+import colorama
+
+
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        "DEBUG": Fore.CYAN,
+        "INFO": Fore.GREEN,
+        "WARNING": Fore.YELLOW,
+        "ERROR": Fore.RED,
+        "CRITICAL": Fore.RED + Style.BRIGHT,
+    }
+
+    def format(self, record):
+        # Save original levelname
+        orig_levelname = record.levelname
+        # Color the levelname
+        color = self.COLORS.get(record.levelname, "")
+        record.levelname = f"{color}{record.levelname}{Style.RESET_ALL}"
+
+        # Color the name and message differently for different loggers
+        if record.name.startswith("pyramid"):
+            record.name = f"{Fore.MAGENTA}{record.name}{Style.RESET_ALL}"
+        else:
+            record.name = f"{Fore.BLUE}{record.name}{Style.RESET_ALL}"
+
+        # Format with colors
+        result = super().format(record)
+        # Restore original levelname
+        record.levelname = orig_levelname
+        return result
+
+
+def setup_colored_logging():
+    # Initialize colorama
+    colorama.init()
+
+    # Set up handler with our custom formatter
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColoredFormatter("%(levelname)-8s %(name)s: %(message)s"))
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    # Remove any existing handlers
+    for h in root_logger.handlers[:]:
+        root_logger.removeHandler(h)
+    # Add our handler
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+
+
+# Get our application logger
+logger = logging.getLogger(__name__)
 
 
 class Company:
@@ -132,16 +183,16 @@ def main(global_config, **settings):
         config.add_static_view(name='static', path='static')
         config.scan()
 
+        setup_colored_logging()
+
         return config.make_wsgi_app()
 
 
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
     config_file = os.path.join(os.path.dirname(here), "development.ini")
-    print(f"Looking for config file at: {config_file}")
     if not os.path.exists(config_file):
-        print(f"Config file not found at {config_file}")
-    else:
-        print(f"Found config file at {config_file}")
+        raise Exception(f"Config file not found at {config_file}")
+
     cmd = PServeCommand(["pserve", config_file])
     cmd.run()
