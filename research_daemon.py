@@ -1,8 +1,9 @@
 import logging
 import signal
-import sqlite3
 import time
+import models
 
+import libjobsearch
 from tasks import TaskStatus, task_manager
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ class ResearchDaemon:
         self.running = False
         # Initialize the database through TaskManager
         self.task_mgr = task_manager()
-
+        self.company_repo = models.company_repository()
     def start(self):
         self.running = True
         signal.signal(signal.SIGINT, self.stop)
@@ -40,13 +41,8 @@ class ResearchDaemon:
             task_id, company_name = row
             try:
                 logger.info(f"Processing task {task_id} for {company_name}")
-                # Update to running state
                 self.task_mgr.update_task(task_id, TaskStatus.RUNNING)
-
-                # Simulate work
-                time.sleep(10)
-                # Your research code here
-
+                self.do_research(company_name)
                 self.task_mgr.update_task(
                     task_id, TaskStatus.COMPLETED, result={"some": "data"}
                 )
@@ -55,6 +51,18 @@ class ResearchDaemon:
             except Exception as e:
                 logger.exception(f"Task {task_id} failed")
                 self.task_mgr.update_task(task_id, TaskStatus.FAILED, error=str(e))
+
+    def do_research(self, company_name: str):
+        existing = self.company_repo.get(company_name)
+        if existing:
+            # TODO: Update existing company
+            logger.info(f"Company {company_name} already exists")
+            self.company_repo.delete(existing.name)
+        logger.info(f"Creating company {company_name}")
+        # TODO: Pass more context from email, etc.
+        MODEL = "claude-3-5-sonnet-latest"  # TODO: Make this configurable
+        company_row = libjobsearch.initial_research_company(company_name, model=MODEL)
+        self.company_repo.create(company_row)
 
 
 if __name__ == "__main__":
