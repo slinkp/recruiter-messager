@@ -6,22 +6,21 @@ import argparse
 import csv
 import dataclasses
 import datetime
-import decimal
 import functools
 import logging
 import os
 import os.path
 import sys
 from decimal import Decimal
-from typing import Any, ClassVar, Generator, Iterator, Optional
+from typing import Any, Generator, Optional
 
-import dateutil.parser
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from pydantic import BaseModel, Field, ValidationError, model_validator
+
+import models
 
 # Constants
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -43,201 +42,6 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 
 FIRST_DATA_ROW = 2  # 0-indexed
-
-
-class BaseSheetRow(BaseModel):
-    """Base class for spreadsheet rows."""
-
-    # Default values, subclasses should override
-
-    # I can feel it, filling columns down and right, oh lord
-    fill_columns: ClassVar[tuple[str, ...]] = tuple()
-    sort_by_date_field: ClassVar[str] = ""
-
-    model_config = {
-        "from_attributes": True,
-        "str_strip_whitespace": True,
-        "coerce_numbers_to_str": False,
-    }
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_base_fields(cls, data: Any) -> dict:
-        """Pre-process fields before Pydantic validation"""
-        if isinstance(data, dict):
-            for field_name, field in cls.model_fields.items():
-                # Hacky, is there a better way to handle eg Optional[date]?
-                val = data.get(field_name)
-                if "date" in str(field.annotation) and isinstance(val, str):
-                    try:
-                        data[field_name] = dateutil.parser.parse(data[field_name])
-                    except (ValueError, ValidationError):
-                        # TODO: only do this if optional
-                        data[field_name] = None
-                elif "bool" in str(field.annotation) and isinstance(val, str):
-                    data[field_name] = (
-                        val.strip().strip().lower() == "yes" if val else None
-                    )
-                elif "int" in str(field.annotation) and isinstance(val, str):
-                    val = val.strip().replace(",", "")
-                    val = val.split(".")[0]
-                    data[field_name] = int(val) if val else None
-                elif "Decimal" in str(field.annotation) and isinstance(val, str):
-                    try:
-                        data[field_name] = Decimal(val)
-                    except decimal.InvalidOperation:
-                        # TODO: only do this if optional
-                        data[field_name] = None
-        return data
-
-    @classmethod
-    def sort_by_date_index(cls) -> int:
-        return cls.field_index(cls.sort_by_date_field)
-
-    @classmethod
-    def is_filled_col_index(cls, col_index: int) -> bool:
-        """Check if a column should be filled down"""
-        for fieldname in cls.fill_columns:
-            if col_index == cls.field_index(fieldname):
-                return True
-        return False
-
-    @classmethod
-    def field_index(cls, field_name: str) -> int:
-        """Get the index of a field in the row"""
-        try:
-            return list(cls.model_fields.keys()).index(field_name)
-        except ValueError:
-            raise ValueError(f"Field {field_name} not found")
-
-    @classmethod
-    def field_name(cls, index: int) -> str:
-        """Get the name of a field by its index"""
-        try:
-            return list(cls.model_fields.keys())[index]
-        except IndexError:
-            raise IndexError(f"Field index {index} out of range")
-
-    def iter_to_strs(self) -> Iterator[str]:
-        """Iterate through fields as strings"""
-        for field_name in self.model_fields.keys():
-            value = getattr(self, field_name)
-            yield str(value) if value is not None else ""
-
-    def as_list_of_str(self) -> list[str]:
-        """Convert row back to list of strings"""
-        return list(self.iter_to_strs())
-
-    def __len__(self) -> int:
-        """Return the number of fields in the row"""
-        return len(self.model_fields)
-
-    def __str__(self) -> str:
-        """Custom string representation showing only non-default values"""
-        cls_name = self.__class__.__name__
-        fields = []
-        for name, field in self.model_fields.items():
-            value = getattr(self, name)
-            default = field.default
-            if value != default:
-                fields.append(f"{name}={value}")
-        if fields:
-            return f"{cls_name}({', '.join(fields)})"
-        return f"{cls_name}()"
-
-    @classmethod
-    def fill_column_indices(cls) -> list[int]:
-        """Get indices of columns that should be filled down"""
-        return [
-            idx
-            for idx, field_name in enumerate(cls.model_fields)
-            if field_name in cls.fill_columns
-        ]
-
-    @classmethod
-    def from_list(cls, row_data: list[str]) -> "BaseSheetRow":
-        """Convert a list of strings into a row instance"""
-        field_names = [name for name in cls.model_fields.keys()]
-        return cls(**dict(zip(field_names, row_data)))
-
-    @property
-    def company_identifier(self) -> str:
-        if self.name and self.url:
-            return f"{self.name} at {self.url}"
-        elif self.name:
-            return self.name
-        elif self.url:
-            return self.url
-        return ""
-
-
-class CompaniesSheetRow(BaseSheetRow):
-    """
-    Schema for the companies spreadsheet.
-    Note, order of fields determines index of column in sheet!
-
-    Also usable as a validated data model for company info.
-    """
-    name: Optional[str] = Field(default="")
-    type: Optional[str] = Field(default="")
-    valuation: Optional[str] = Field(default="")
-    funding_series: Optional[str] = Field(default="")
-    rc: Optional[bool] = Field(default=None)
-    url: Optional[str] = Field(default="")
-
-    current_state: Optional[str] = Field(default=None)  # TODO validate values
-    updated: Optional[datetime.date] = Field(default=None)
-
-    started: Optional[datetime.date] = Field(default=None)
-    latest_step: Optional[str] = Field(default=None)
-    next_step: Optional[str] = Field(default=None)
-    next_step_date: Optional[datetime.date] = Field(default=None)
-    latest_contact: Optional[str] = Field(default=None)
-
-    end_date: Optional[datetime.date] = Field(default=None)
-
-    maybe_referrals: Optional[str] = Field(default=None)
-    referral_name: Optional[str] = Field(default=None)
-    recruit_contact: Optional[str] = Field(default=None)
-
-    total_comp: Optional[decimal.Decimal] = Field(default=None)
-    base: Optional[decimal.Decimal] = Field(default=None)
-    rsu: Optional[decimal.Decimal] = Field(default=None)
-    bonus: Optional[decimal.Decimal] = Field(default=None)
-    vesting: Optional[str] = Field(default=None)
-    level_equiv: Optional[str] = Field(default=None)
-
-    leetcode: Optional[bool] = Field(default=None)
-    sys_design: Optional[bool] = Field(default=None)
-
-    ai_notes: Optional[str] = Field(default=None)
-
-    remote_policy: Optional[str] = Field(default=None)  # TODO validate values
-    eng_size: Optional[int] = Field(default=None)
-    total_size: Optional[int] = Field(default=None)
-    headquarters: Optional[str] = Field(default=None)
-    ny_address: Optional[str] = Field(default=None)
-    commute_home: Optional[str] = Field(default=None)
-    commute_lynn: Optional[str] = Field(default=None)
-
-    notes: Optional[str] = Field(default=None)
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_fields(cls, data: Any) -> dict:
-        """Normalize fields that require validation"""
-        if isinstance(data, dict) and "cleared" in data:
-            cleared = data["cleared"]
-            if isinstance(cleared, (bool, type(None))):
-                data["cleared"] = "yes" if cleared else ""
-            elif cleared and str(cleared).strip().lower() == "yes":
-                data["cleared"] = "yes"
-            else:
-                data["cleared"] = ""
-        return data
-
-    fill_columns: ClassVar[tuple[str, ...]] = ()
-    sort_by_date_field: ClassVar[str] = "updated"
 
 
 @functools.cache
@@ -296,7 +100,7 @@ class CompaniesImporter(abc.ABC):
 
     reverse_cron = True  # Default value, can be overridden in subclasses
 
-    def __init__(self, prev_lines: list[CompaniesSheetRow] | None = None):
+    def __init__(self, prev_lines: list[models.CompaniesSheetRow] | None = None):
         self.prev_lines = prev_lines or []
         self.seen_checksums = set()
         self.out_buffer = []
@@ -314,7 +118,7 @@ class CompaniesImporter(abc.ABC):
             self.seen_checksums.add(checksum)
             yield [str(item) for item in line]
 
-    def checksum_finder(self, row: CompaniesSheetRow) -> str | None:
+    def checksum_finder(self, row: models.CompaniesSheetRow) -> str | None:
         parts = row.name.lower().split()
         return checksum(parts)
 
@@ -330,7 +134,7 @@ class CompaniesImporter(abc.ABC):
 
 
 @dataclasses.dataclass(kw_only=True)
-class StubRow(BaseSheetRow):
+class StubRow(models.BaseSheetRow):
     blah: str = "blahblah"
     fill_columns = tuple()
     sort_by_date_field = "blah"
@@ -566,14 +370,14 @@ class BaseGoogleSheetClient:
         request.execute()
 
     def update_row_partial(
-        self, row_index: int, cell_updates: dict[int, Any] | BaseSheetRow
+        self, row_index: int, cell_updates: dict[int, Any] | models.BaseSheetRow
     ):
         """Update specific cells in a row, leaving others untouched."""
         # TODO test this method
         range_name = f"{self.range_name.split('!')[0]}!"
         batch_data = []
 
-        if isinstance(cell_updates, BaseSheetRow):
+        if isinstance(cell_updates, models.BaseSheetRow):
             cell_updates = dict(enumerate(cell_updates.as_list_of_str()))
 
         for col_index, value in cell_updates.items():
@@ -630,7 +434,7 @@ class BaseGoogleSheetClient:
 
 
 class MainTabCompaniesClient(BaseGoogleSheetClient):
-    row_class = CompaniesSheetRow
+    row_class = models.CompaniesSheetRow
     importer_class = CompaniesImporter
 
 
@@ -701,7 +505,7 @@ def main(argv: list[str]):
         import uuid
 
         name = f"Test Company {uuid.uuid4()}"
-        row = CompaniesSheetRow(
+        row = models.CompaniesSheetRow(
             name=name,
             updated=datetime.date.today(),
             current_state="10. consider applying",

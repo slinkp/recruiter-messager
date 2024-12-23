@@ -20,7 +20,8 @@ import company_researcher
 import email_client
 import levels_searcher
 import linkedin_searcher
-from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
+from companies_spreadsheet import MainTabCompaniesClient
+from models import CompaniesSheetRow
 from rag import RecruitmentRAG
 
 logger = logging.getLogger(__name__)

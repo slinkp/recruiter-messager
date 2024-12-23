@@ -8,11 +8,12 @@ import json
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 
-from companies_spreadsheet import CompaniesSheetRow
 
 import logging
 from colorama import Fore, Style
 import colorama
+
+import models
 
 
 class ColoredFormatter(logging.Formatter):
@@ -66,107 +67,10 @@ def setup_colored_logging():
 logger = logging.getLogger(__name__)
 
 
-class Company(BaseModel):
-    name: str
-    details: CompaniesSheetRow
-    initial_message: Optional[str] = None
-    reply_message: str = ""
-
-
-class CompanyRepository:
-    def __init__(self):
-        self._companies: Dict[str, Company] = {
-            company.name: company for company in SAMPLE_COMPANIES
-        }
-
-    def get(self, name: str) -> Optional[Company]:
-        logger.info(f"Getting company {name}")
-        return self._companies.get(name)
-
-    def get_all(self) -> List[Company]:
-        logger.info(f"Getting all companies")
-        return list(self._companies.values())
-
-    def create(self, company: Company) -> Company:
-        if company.name in self._companies:
-            raise ValueError(f"Company {company.name} already exists")
-        logger.info(f"Creating and saving company {company.name}")
-        self._companies[company.name] = company
-        return company
-
-    def update(self, company: Company) -> Company:
-        if company.name not in self._companies:
-            raise ValueError(f"Company {company.name} not found")
-        logger.info(f"Updating company {company.name}")
-        self._companies[company.name] = company
-        return company
-
-    def delete(self, name: str) -> None:
-        if name not in self._companies:
-            raise ValueError(f"Company {name} not found")
-        logger.info(f"Deleting company {name}")
-        del self._companies[name]
-
-
-# Sample data (same as before)
-SAMPLE_COMPANIES = [
-    Company(
-        name="Shopify",
-        details=CompaniesSheetRow(
-            name="Shopify",
-            type="Public",
-            valuation="10B",
-            url="https://shopify.com",
-            current_state="Active",
-            updated=date(2024, 12, 15),
-            eng_size=4000,
-            total_size=10000,
-            headquarters="Ottawa",
-            remote_policy="Remote",
-        ),
-        initial_message="Hi Paul, are you interested in working as a staff developer at Shopify? Regards, Bobby Bobberson",
-    ),
-    Company(
-        name="Rippling",
-        details=CompaniesSheetRow(
-            name="Rippling",
-            type="Private Unicorn",
-            valuation="1500M",
-            url="https://rippling.com",
-            current_state="Active",
-            updated=date(2024, 10, 10),
-            headquarters="New York",
-        ),
-        initial_message="Hi Paul! Interested in a senior backend role at Rippling? - Mark Marker",
-    ),
-]
-
-
-def serialize_company(company: Company):
-    data = company.model_dump()
-    data["details"] = {
-        k: (v.isoformat() if isinstance(v, date) else v)
-        for k, v in company.details.model_dump().items()
-        if v is not None
-    }
-    return data
-
-
-# Module-level singleton storage
-_company_repository = None
-
-
-def company_repository() -> CompanyRepository:
-    global _company_repository
-    if _company_repository is None:
-        _company_repository = CompanyRepository()
-    return _company_repository
-
-
 @view_config(route_name="companies", renderer="json", request_method="GET")
 def get_companies(request):
-    companies = company_repository().get_all()
-    return [serialize_company(company) for company in companies]
+    companies = models.company_repository().get_all()
+    return [models.serialize_company(company) for company in companies]
 
 
 @view_config(route_name="home")
@@ -199,16 +103,16 @@ def update_message(request):
             request.response.status = 400
             return {"error": "Message is required"}
 
-        company = company_repository().get(company_name)
+        company = models.company_repository().get(company_name)
         if not company:
             request.response.status = 404
             return {"error": "Company not found"}
 
         company.reply_message = message
-        company_repository().update(company)
+        models.company_repository().update(company)
 
         logger.info(f"Updated message for {company_name}: {message}")
-        return {"message": message}
+        return models.serialize_company(company)
     except json.JSONDecodeError:
         request.response.status = 400
         return {"error": "Invalid JSON"}
@@ -217,14 +121,14 @@ def update_message(request):
 @view_config(route_name="research", renderer="json", request_method="POST")
 def research_company(request):
     company_name = request.matchdict["company_name"]
-    company = company_repository().get(company_name)
+    company = models.company_repository().get(company_name)
 
     if not company:
         request.response.status = 404
         return {"error": "Company not found"}
 
     logger.info(f"Research requested for {company_name}")
-    return serialize_company(company)
+    return models.serialize_company(company)
 
 
 def main(global_config, **settings):
@@ -251,7 +155,7 @@ def main(global_config, **settings):
         setup_colored_logging()
 
         # Initialize repository
-        company_repository()
+        models.company_repository()
 
         return config.make_wsgi_app()
 
