@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companies Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1/css/pico.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="/static/app.js"></script>
+</head>
+<body>
+    <main class="container" x-data="companyList">
+        <h1>Companies Dashboard</h1>
+        
+        <div x-show="loading">Loading...</div>
+        
+        <template x-for="company in companies" :key="company.name">
+            <article>
+                <header x-text="company.name"></header>
+                <p>
+                    Type: <span x-text="company.type"></span><br>
+                    Valuation: <span x-text="company.valuation"></span>
+                </p>
+            </article>
+        </template>
+    </main>
+</body>
+</html>
