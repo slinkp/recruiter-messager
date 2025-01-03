@@ -214,10 +214,12 @@ class Company(BaseModel):
     reply_message: str = ""
 
 
-class DateJSONEncoder(json.JSONEncoder):
+class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.date):
             return obj.isoformat()
+        if isinstance(obj, decimal.Decimal):
+            return str(obj)
         return super().default(obj)
 
 
@@ -260,7 +262,7 @@ class CompanyRepository:
                             (
                                 company.name,
                                 json.dumps(
-                                    company.details.model_dump(), cls=DateJSONEncoder
+                                    company.details.model_dump(), cls=CustomJSONEncoder
                                 ),
                                 company.initial_message,
                                 company.reply_message,
@@ -304,7 +306,7 @@ class CompanyRepository:
                         (
                             company.name,
                             json.dumps(
-                                company.details.model_dump(), cls=DateJSONEncoder
+                                company.details.model_dump(), cls=CustomJSONEncoder
                             ),
                             company.initial_message,
                             company.reply_message,
@@ -343,6 +345,29 @@ class CompanyRepository:
                 if cursor.rowcount == 0:
                     raise ValueError(f"Company {name} not found")
                 conn.commit()
+
+    def _deserialize_company(self, row) -> Company:
+        """Convert a database row into a Company object."""
+        if not row:
+            return None
+
+        name, details_json, initial_message, reply_message = row
+        details_dict = json.loads(details_json)
+
+        # Convert ISO format dates back to datetime.date
+        for key, value in details_dict.items():
+            if isinstance(value, str) and "date" in key:
+                try:
+                    details_dict[key] = dateutil.parser.parse(value).date()
+                except (ValueError, TypeError):
+                    details_dict[key] = None
+
+        return Company(
+            name=name,
+            details=CompaniesSheetRow(**details_dict),
+            initial_message=initial_message,
+            reply_message=reply_message,
+        )
 
 
 # Sample data

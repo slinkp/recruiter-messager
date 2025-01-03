@@ -62,7 +62,8 @@ class ResearchDaemon:
         # TODO: Pass more context from email, etc.
         MODEL = "claude-3-5-sonnet-latest"  # TODO: Make this configurable
         company_row = libjobsearch.initial_research_company(company_name, model=MODEL)
-        self.company_repo.create(company_row)
+        company = models.Company(name=company_name, details=company_row)
+        self.company_repo.create(company)
 
 
 if __name__ == "__main__":
