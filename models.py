@@ -2,6 +2,11 @@ import datetime
 from typing import Any, ClassVar, Dict, Iterator, List, Optional
 import dateutil.parser
 import decimal
+import multiprocessing
+import sqlite3
+import json
+from contextlib import contextmanager
+import os
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
@@ -209,34 +214,135 @@ class Company(BaseModel):
     reply_message: str = ""
 
 
+class DateJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.date):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 class CompanyRepository:
-    def __init__(self):
-        self._companies: Dict[str, Company] = {
-            company.name: company for company in SAMPLE_COMPANIES
-        }
+
+    def __init__(self, db_path: str = "data/companies.db"):
+        self.db_path = db_path
+        self.lock = multiprocessing.Lock()
+        self._ensure_db_dir()
+        self._init_db()
+
+    def _ensure_db_dir(self):
+        """Ensure the database directory exists."""
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+
+    def _init_db(self):
+        with self.lock:
+            with self._get_connection() as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS companies (
+                        name TEXT PRIMARY KEY,
+                        details TEXT NOT NULL,
+                        initial_message TEXT,
+                        reply_message TEXT NOT NULL DEFAULT ''
+                    )
+                """
+                )
+
+                # Initialize with sample data if table is empty
+                cursor = conn.execute("SELECT COUNT(*) FROM companies")
+                if cursor.fetchone()[0] == 0:
+                    for company in SAMPLE_COMPANIES:
+                        conn.execute(
+                            """
+                            INSERT INTO companies 
+                            (name, details, initial_message, reply_message) 
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (
+                                company.name,
+                                json.dumps(
+                                    company.details.model_dump(), cls=DateJSONEncoder
+                                ),
+                                company.initial_message,
+                                company.reply_message,
+                            ),
+                        )
+                conn.commit()
+
+    @contextmanager
+    def _get_connection(self):
+        # Create a new connection each time, don't store in thread local
+        connection = sqlite3.connect(self.db_path, timeout=60.0)
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     def get(self, name: str) -> Optional[Company]:
-        return self._companies.get(name)
+        # Reads can happen without the lock
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT name, details, initial_message, reply_message FROM companies WHERE name = ?",
+                (name,),
+            )
+            row = cursor.fetchone()
+            return self._deserialize_company(row) if row else None
 
     def get_all(self) -> List[Company]:
-        return list(self._companies.values())
+        # Reads can happen without the lock
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT name, details, initial_message, reply_message FROM companies"
+            )
+            return [self._deserialize_company(row) for row in cursor.fetchall()]
 
     def create(self, company: Company) -> Company:
-        if company.name in self._companies:
-            raise ValueError(f"Company {company.name} already exists")
-        self._companies[company.name] = company
-        return company
+        with self.lock:
+            with self._get_connection() as conn:
+                try:
+                    conn.execute(
+                        "INSERT INTO companies (name, details, initial_message, reply_message) VALUES (?, ?, ?, ?)",
+                        (
+                            company.name,
+                            json.dumps(
+                                company.details.model_dump(), cls=DateJSONEncoder
+                            ),
+                            company.initial_message,
+                            company.reply_message,
+                        ),
+                    )
+                    conn.commit()
+                    return company
+                except sqlite3.IntegrityError:
+                    raise ValueError(f"Company {company.name} already exists")
 
     def update(self, company: Company) -> Company:
-        if company.name not in self._companies:
-            raise ValueError(f"Company {company.name} not found")
-        self._companies[company.name] = company
-        return company
+        with self.lock:  # Lock for writes
+            with self._get_connection() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE companies 
+                    SET details = ?, initial_message = ?, reply_message = ?
+                    WHERE name = ?
+                    """,
+                    (
+                        json.dumps(company.details.model_dump()),
+                        company.initial_message,
+                        company.reply_message,
+                        company.name,
+                    ),
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError(f"Company {company.name} not found")
+                conn.commit()
+                return company
 
     def delete(self, name: str) -> None:
-        if name not in self._companies:
-            raise ValueError(f"Company {name} not found")
-        del self._companies[name]
+        with self.lock:  # Lock for writes
+            with self._get_connection() as conn:
+                cursor = conn.execute("DELETE FROM companies WHERE name = ?", (name,))
+                if cursor.rowcount == 0:
+                    raise ValueError(f"Company {name} not found")
+                conn.commit()
 
 
 # Sample data
