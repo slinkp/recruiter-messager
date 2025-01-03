@@ -695,9 +695,7 @@ class LevelsExtractor:
         if not level_container.is_visible(timeout=5000):
             self.page.screenshot(path="level_container_not_visible.png")
             logger.error(f"No level container. Current URL: {self.page.url}")
-            raise RuntimeError(
-                "Could not find level container. Check screenshot level_container_not_visible.png"
-            )
+            return []  # Return empty list instead of raising
 
         # Find both company columns
         company_cols = level_container.locator(".level-col").all()
@@ -793,14 +791,33 @@ class LevelsExtractor:
 
         if l7_data:
             l7_start = l7_data["distance_from_top"]
-            l7_end = l7_start + l7_data["row_height"]
+            l7_end = (
+                l7_start + l7_data["row_height"]
+                if l7_start is not None and l7_data["row_height"] is not None
+                else None
+            )
+
+            if l7_end is None:
+                logger.warning("Could not determine L7 position in table")
+                return []
+
             logger.info(f"L7 spans from {l7_start}px to {l7_end}px")
 
             # Find overlapping rows in first table
             first_company = results[0]
             for level in first_company["levels"]:
                 level_start = level["distance_from_top"]
-                level_end = level_start + level["row_height"]
+                level_end = (
+                    level_start + level["row_height"]
+                    if level_start is not None and level["row_height"] is not None
+                    else None
+                )
+
+                if level_start is None or level_end is None:
+                    logger.warning(
+                        f"Skipping level {level['level']} - missing position data"
+                    )
+                    continue
 
                 # Check for overlap
                 if level_start <= l7_end and level_end >= l7_start:
