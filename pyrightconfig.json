@@ -1,0 +1,7 @@
+{
+    "typeCheckingMode": "basic",
+    "reportMissingTypeStubs": false,
+    "venvPath": ".direnv",
+    "venv": "python3.13",
+    "useLibraryCodeForTypes": true
+} 
