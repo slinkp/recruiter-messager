@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, ClassVar, Dict, Iterator, List, Optional
+from typing import Any, ClassVar, Iterator, List, Optional
 import dateutil.parser
 import decimal
 import multiprocessing
@@ -7,6 +7,7 @@ import sqlite3
 import json
 from contextlib import contextmanager
 import os
+
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
@@ -126,16 +127,6 @@ class BaseSheetRow(BaseModel):
         field_names = [name for name in cls.model_fields.keys()]
         return cls(**dict(zip(field_names, row_data)))
 
-    @property
-    def company_identifier(self) -> str:
-        if self.name and self.url:
-            return f"{self.name} at {self.url}"
-        elif self.name:
-            return self.name
-        elif self.url:
-            return self.url
-        return ""
-
 
 class CompaniesSheetRow(BaseSheetRow):
     """
@@ -205,6 +196,16 @@ class CompaniesSheetRow(BaseSheetRow):
 
     fill_columns: ClassVar[tuple[str, ...]] = ()
     sort_by_date_field: ClassVar[str] = "updated"
+
+    @property
+    def company_identifier(self) -> str:
+        if self.name and self.url:
+            return f"{self.name} at {self.url}"
+        elif self.name:
+            return self.name
+        elif self.url:
+            return self.url
+        return ""
 
 
 class Company(BaseModel):
@@ -346,11 +347,9 @@ class CompanyRepository:
                     raise ValueError(f"Company {name} not found")
                 conn.commit()
 
-    def _deserialize_company(self, row) -> Company:
+    def _deserialize_company(self, row: tuple[str, str, str, str]) -> Company:
         """Convert a database row into a Company object."""
-        if not row:
-            return None
-
+        assert row is not None
         name, details_json, initial_message, reply_message = row
         details_dict = json.loads(details_json)
 

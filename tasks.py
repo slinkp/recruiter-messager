@@ -90,7 +90,11 @@ class TaskManager:
         return None
 
     def update_task(
-        self, task_id: str, status: TaskStatus, result: dict = None, error: str = None
+        self,
+        task_id: str,
+        status: TaskStatus,
+        result: Optional[dict] = None,
+        error: str = "",
     ):
         with self.lock:
             with sqlite3.connect(self.db_path) as conn:
