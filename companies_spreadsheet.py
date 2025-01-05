@@ -180,12 +180,9 @@ class BaseGoogleSheetClient:
         self.sheet_id = sheet_id
         self.service = build("sheets", "v4", credentials=creds)
 
-    def main(self, csv_infile_name: Optional[str] = None):
+    def main(self):
         logger.info(f"Importing to range {self.range_name}")
-        if csv_infile_name is not None:
-            new_rows = self.read_rows_from_csv_file(csv_infile_name)
-        else:
-            new_rows = self.get_new_rows()
+        new_rows = self.get_new_rows()
         self.append_rows(new_rows)
         self.cleanup_after_changes()
 
@@ -199,14 +196,6 @@ class BaseGoogleSheetClient:
         self.sort_by_date()
         self.delete_trailing_empty_rows()
         self.update_formatting()
-
-    @classmethod
-    def read_rows_from_csv_file(cls, csv_infile_name: str | None) -> list[list[str]]:
-        if csv_infile_name is None:
-            return []
-        with open(csv_infile_name) as infile:
-            reader = csv.reader(infile)
-            return list(reader)
 
     def delete_trailing_empty_rows(self):
         """
@@ -477,13 +466,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-f",
-        "--filename",
-        action="store",
-        help="CSV file to import. Must be already processed into the final expected format!",
-    )
-
-    parser.add_argument(
         "-d", "--dump", action="store_true", help="Dump the existing data to stdout"
     )
     parser.add_argument(
@@ -530,12 +512,7 @@ def main(argv: list[str]):
         print(f"Loaded row: {row}")
         return
 
-    csv_infile_name: Optional[str] = args.filename
-
-    if csv_infile_name:
-        main_client.main(csv_infile_name)
-    else:
-        main_client.main()
+    main_client.main()
 
 
 if __name__ == "__main__":  # pragma: no cover
