@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 import logging
 from colorama import Fore, Style
 import colorama
+from pyramid.renderers import JSON
 
 import models
 import tasks
@@ -173,6 +174,14 @@ def main(global_config, **settings):
 
         # Initialize repository
         models.company_repository()
+
+        # Configure JSON renderer to use our custom encoder
+        config.add_renderer(
+            "json",
+            JSON(
+                serializer=lambda v, **kw: json.dumps(v, cls=models.CustomJSONEncoder)
+            ),
+        )
 
         return config.make_wsgi_app()
 
