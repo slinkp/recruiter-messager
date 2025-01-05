@@ -2,6 +2,7 @@ import argparse
 import datetime
 import decimal
 import logging
+import queue
 import os
 import os.path
 import subprocess
@@ -101,28 +102,61 @@ def disk_cache(step: CacheStep):
     return decorator
 
 
-def process_wrapper(queue: Queue, func, args, kwargs):
-    """Helper function to run a function in a process and put its result in a queue."""
-    result = func(*args, **kwargs)
-    queue.put(result)
-
-
-def run_in_process(func, *args, **kwargs):
+def run_in_process(func, *args, timeout=300, **kwargs):
     """
     Run a function in a separate process and return its result.
 
     Args:
         func: The function to run
+        timeout: Maximum time to wait for result in seconds
         *args, **kwargs: Arguments to pass to the function
 
     Returns:
         The result of running the function
+
+    Raises:
+        TimeoutError: If the function takes longer than timeout seconds
+        Exception: If the function raises an exception
     """
     result_queue = Queue()
-    process = Process(target=process_wrapper, args=(result_queue, func, args, kwargs))
+    error_queue = Queue()
+
+    def wrapper():
+        try:
+            result = func(*args, **kwargs)
+            result_queue.put(result)
+        except Exception as e:
+            error_queue.put((type(e), str(e)))
+
+    process = Process(target=wrapper)
     process.start()
-    process.join()
-    return result_queue.get()
+
+    try:
+        # Check error queue first
+        try:
+            exc_type, exc_msg = error_queue.get(timeout=timeout)
+            raise exc_type(exc_msg)
+        except TimeoutError:
+            pass
+        except queue.Empty:
+            pass
+
+        # If no error, get result
+        try:
+            return result_queue.get(timeout=timeout)
+        except queue.Empty:
+            raise TimeoutError(
+                f"Function {func.__name__} timed out after {timeout} seconds"
+            )
+
+    finally:
+        if process.is_alive():
+            logger.warning(f"Terminating still-running process {process.pid}...")
+            process.terminate()
+            process.join(timeout=1.0)
+            if process.is_alive():
+                logger.warning(f"Killing still-running process {process.pid}...")
+                process.kill()
 
 
 @disk_cache(CacheStep.BASIC_RESEARCH)
