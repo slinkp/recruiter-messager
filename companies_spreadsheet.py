@@ -12,7 +12,7 @@ import os
 import os.path
 import sys
 from decimal import Decimal
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Iterable, Optional
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -90,7 +90,16 @@ def checksum(line: list[str]):
     return checksum
 
 
-class CompaniesImporter(abc.ABC):
+class BaseImporter(abc.ABC):
+    @abc.abstractmethod
+    def generate_data_lines(self) -> Iterable[list[str]]:
+        pass
+
+    def __init__(self, prev_lines: list[Any] | None = None):
+        pass
+
+
+class CompaniesImporter(BaseImporter):
     """
     Importers are responsible for loading data eg. from a file,
     parsing the data, and finding new lines (that don't match prev_lines).
@@ -106,7 +115,7 @@ class CompaniesImporter(abc.ABC):
         self.out_buffer = []
         self.update_seen_checksums()
 
-    def generate_data_lines(self) -> Generator[list[str], None, None]:
+    def generate_data_lines(self) -> Iterable[list[str]]:
         """
         Yields arrays of parsed line data.
         Skips lines that have a checksum that's already been seen.
@@ -119,7 +128,7 @@ class CompaniesImporter(abc.ABC):
             yield [str(item) for item in line]
 
     def checksum_finder(self, row: models.CompaniesSheetRow) -> str | None:
-        parts = row.name.lower().split()
+        parts = row.name.lower().split() if row.name else []
         return checksum(parts)
 
     def update_seen_checksums(self) -> None:
@@ -127,6 +136,7 @@ class CompaniesImporter(abc.ABC):
             checksum = self.checksum_finder(row)
             if checksum:
                 self.seen_checksums.add(checksum)
+
 
 ##############################################################################################
 # Clients
@@ -156,6 +166,7 @@ class BaseGoogleSheetClient:
     """
 
     row_class: type[Any] = StubRow
+    importer_class: type[BaseImporter] = BaseImporter
 
     def __init__(
         self,
@@ -509,8 +520,8 @@ def main(argv: list[str]):
             name=name,
             updated=datetime.date.today(),
             current_state="10. consider applying",
-            base=200,
-            rsu=100,
+            base=Decimal(200),
+            rsu=Decimal(100),
             leetcode=True,
             sys_design=True,
             ai_notes="Something something LLM",
