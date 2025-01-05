@@ -2,19 +2,20 @@ import argparse
 import datetime
 import decimal
 import logging
-import queue
 import os
 import os.path
+import queue
+import re
 import subprocess
 import tempfile
 from collections import defaultdict
 from enum import IntEnum
 from functools import wraps
 from multiprocessing import Process, Queue
-import re
+from typing import Any
 
-from diskcache import Cache
 from colorama import Fore, Style
+from diskcache import Cache
 
 import companies_spreadsheet
 import company_researcher
@@ -288,12 +289,12 @@ def maybe_edit_reply(reply: str) -> str:
         os.unlink(temp_path)
 
 
-def archive_message(msg: str):
+def archive_message(msg: Any):
     # TODO: re-label the message AND my reply in the archive label
     # TODO: maybe if it's a good fit, we make a new label for that company?
     # eh, probably leave that manual for now.
     # TODO: add that reply to the RAG context
-    logger.info(f"Archiving message")
+    logger.info(f"Not implemented: Archiving message")
     pass
 
 
@@ -340,7 +341,7 @@ class EmailResponder:
     @disk_cache(CacheStep.GET_MESSAGES)
     def get_new_recruiter_messages(
         self, max_results: int = 100
-    ) -> list[tuple[str, str, str]]:
+    ) -> list[dict[str, Any]]:
         logger.info(f"Getting {max_results} new recruiter messages")
         message_dicts = self.email_client.get_new_recruiter_messages(
             max_results=max_results
@@ -418,7 +419,7 @@ def main(args, loglevel: int = logging.INFO):
 
     for i, msg in enumerate(new_recruiter_email):
         logger.info(f"Processing message {i+1} of {len(new_recruiter_email)}...")
-        content = msg.get("combined_content").strip()
+        content = msg["combined_content"].strip()
         if not content:
             logger.warning("Empty message, skipping")
             continue
