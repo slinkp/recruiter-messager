@@ -8,7 +8,7 @@ from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build, Resource
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUTH_DIR = os.path.join(HERE, "secrets")
@@ -38,7 +38,14 @@ class GmailRepliesSearcher:
 
     def __init__(self):
         self.creds = None
-        self.service = None
+        self._service = None
+
+    @property
+    def service(self) -> Resource:
+        if self._service is None:
+            self.authenticate()
+        assert self._service is not None
+        return self._service
 
     def authenticate(self):
         if os.path.exists(TOKEN_FILE):
@@ -57,7 +64,7 @@ class GmailRepliesSearcher:
                 self.creds = flow.run_local_server(port=0)
             with open(TOKEN_FILE, "w") as token:
                 token.write(self.creds.to_json())
-        self.service = build("gmail", "v1", credentials=self.creds)
+        self._service = build("gmail", "v1", credentials=self.creds)
 
     def search_messages(self, query, max_results: int = 10) -> list:
         results = (
@@ -183,7 +190,6 @@ class GmailRepliesSearcher:
 
 if __name__ == "__main__":
     searcher = GmailRepliesSearcher()
-    searcher.authenticate()
     query = RECRUITER_REPLIES_QUERY
     processed_messages = searcher.get_my_replies_to_recruiters(query, max_results=10)
     processed_messages = processed_messages[:3]
