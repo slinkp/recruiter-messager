@@ -12,7 +12,7 @@ from collections import defaultdict
 from enum import IntEnum
 from functools import wraps
 from multiprocessing import Process, Queue
-from typing import Any
+from typing import Any, Callable
 from diskcache import Cache
 
 import companies_spreadsheet
@@ -102,7 +102,16 @@ def disk_cache(step: CacheStep):
     return decorator
 
 
-def run_in_process(func, *args, timeout=300, **kwargs):
+def _process_wrapper(func, args, kwargs, result_queue, error_queue):
+    # This needs to be a separate function to avoid pickling issues.
+    try:
+        result = func(*args, **kwargs)
+        result_queue.put(result)
+    except Exception as e:
+        error_queue.put((type(e), str(e)))
+
+
+def run_in_process(func: Callable, *args, timeout=300, **kwargs) -> Any:
     """
     Run a function in a separate process and return its result.
 
@@ -121,14 +130,9 @@ def run_in_process(func, *args, timeout=300, **kwargs):
     result_queue = Queue()
     error_queue = Queue()
 
-    def wrapper():
-        try:
-            result = func(*args, **kwargs)
-            result_queue.put(result)
-        except Exception as e:
-            error_queue.put((type(e), str(e)))
-
-    process = Process(target=wrapper)
+    process = Process(
+        target=_process_wrapper, args=(func, args, kwargs, result_queue, error_queue)
+    )
     process.start()
 
     try:
