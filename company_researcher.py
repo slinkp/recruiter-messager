@@ -247,7 +247,9 @@ class TavilyRAGResearchAgent:
 
         for prompt, format_prompt in COMPANY_PROMPTS_WITH_FORMAT_PROMPT:
             try:
-                context = self.get_search_context(prompt)
+                context = self.get_search_context(
+                    prompt.format(company_info=company_info)
+                )
                 logger.debug(f"  Got Context: {len(context)}")
                 full_prompt = self.make_prompt(
                     prompt,
