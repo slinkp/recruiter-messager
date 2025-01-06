@@ -2,6 +2,8 @@ import logging
 import signal
 import time
 import models
+import argparse
+from logsetup import setup_logging
 
 import libjobsearch
 from tasks import TaskStatus, task_manager
@@ -67,6 +69,12 @@ class ResearchDaemon:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Print verbose logging"
+    )
+    args = parser.parse_args()
+
+    setup_logging(args.verbose)
     daemon = ResearchDaemon()
     daemon.start()
