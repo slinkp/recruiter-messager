@@ -13,8 +13,6 @@ from enum import IntEnum
 from functools import wraps
 from multiprocessing import Process, Queue
 from typing import Any
-
-from colorama import Fore, Style
 from diskcache import Cache
 
 import companies_spreadsheet
@@ -25,6 +23,7 @@ import linkedin_searcher
 from companies_spreadsheet import MainTabCompaniesClient
 from models import CompaniesSheetRow
 from rag import RecruitmentRAG
+from logsetup import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -443,52 +442,6 @@ def main(args, loglevel: int = logging.INFO):
         logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
 
 
-class ColoredLogFormatter(logging.Formatter):
-    """Custom formatter that adds colors based on log level"""
-
-    COLORS = {
-        logging.DEBUG: Fore.BLUE,
-        logging.INFO: Fore.GREEN,
-        logging.WARNING: Fore.YELLOW,
-        logging.ERROR: Fore.RED,
-        logging.CRITICAL: Fore.RED + Style.BRIGHT,
-    }
-
-    def format(self, record):
-        # Add color to the level name
-        color = self.COLORS.get(record.levelno, Fore.WHITE)
-        record.levelname = f"{color}{record.levelname}{Style.RESET_ALL}"
-
-        # Add color to the module name
-        record.name = f"{Fore.CYAN}{record.name}{Style.RESET_ALL}"
-
-        return super().format(record)
-
-
-def setup_logging(args: argparse.Namespace):
-    import colorama
-
-    colorama.init()
-
-    # Create console handler with custom formatter
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(
-        ColoredLogFormatter(
-            fmt="%(asctime)s %(levelname)s %(name)s: %(message)s",
-            datefmt="%H:%M:%S",
-        )
-    )
-
-    # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-    root_logger.addHandler(console_handler)
-
-    # Configure this module's logger
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -557,7 +510,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    setup_logging(args)
+    setup_logging(args.verbose)
     # Clear all cache if requested (do this before any other operations)
     if args.clear_all_cache:
         logger.info("Clearing all cache...")
