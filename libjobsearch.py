@@ -34,8 +34,8 @@ cache = Cache(os.path.join(HERE, ".cache"))
 
 
 class CacheStep(IntEnum):
-    RAG_CONTEXT = 0
-    GET_MESSAGES = 1
+    GET_MESSAGES = 0
+    RAG_CONTEXT = 1
     BASIC_RESEARCH = 2
     FOLLOWUP_RESEARCH = 3
     REPLY = 4
@@ -319,8 +319,12 @@ class EmailResponder:
     ) -> RecruitmentRAG:  # Set up the RAG pipeline
         logger.info("Building RAG...")
         rag = RecruitmentRAG(old_messages, loglevel=self.loglevel)
-        # TODO: Granular cache control here.
-        rag.prepare_data(clear_existing=cache_args.no_cache)
+        clear_rag_context = cache_args.should_clear_cache(CacheStep.RAG_CONTEXT)
+        if clear_rag_context:
+            logger.info("Rebuilding RAG data from scratch...")
+        else:
+            logger.info("Reusing existing RAG data...")
+        rag.prepare_data(clear_existing=clear_rag_context)
         rag.setup_chain(llm_type=self.reply_rag_model)
         logger.info(f"...RAG setup complete")
         return rag
