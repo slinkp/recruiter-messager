@@ -13,9 +13,9 @@ class LinkedInSearcher:
 
     def __init__(self, debug: bool = False):
         # Fetch credentials from environment
-        self.email = os.environ.get("LINKEDIN_EMAIL")
-        self.password = os.environ.get("LINKEDIN_PASSWORD")
-        self.debug = debug
+        self.email: str = os.environ.get("LINKEDIN_EMAIL", "")
+        self.password: str = os.environ.get("LINKEDIN_PASSWORD", "")
+        self.debug: bool = debug
         if not all([self.email, self.password]):
             raise ValueError("LinkedIn credentials not found in environment")
 
