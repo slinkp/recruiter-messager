@@ -204,7 +204,7 @@ class CompaniesSheetRow(BaseSheetRow):
         elif self.name:
             return self.name
         elif self.url:
-            return self.url
+            return f"with unknown name at {self.url}"
         return ""
 
 

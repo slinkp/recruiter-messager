@@ -28,7 +28,7 @@ GET_SEARCH_CONTEXT_INPUT_LIMIT = 400
 
 # PROMPT_LIMIT
 BASIC_COMPANY_PROMPT = """
-For the company at {company_info.company_identifier}, find:
+For the company {company_info.company_identifier}, find:
  - City and country of the company's headquarters.
  - Address of the company's NYC office, if there is one.
  - Total number of employees worldwide. 
@@ -50,7 +50,7 @@ The value of headquarters_city must be the city, state/province, and country of 
 # """
 
 FUNDING_STATUS_PROMPT = """
-For the company at {company_info.company_identifier}, find:
+For the company {company_info.company_identifier}, find:
  - The company's public/private status.  If there is a stock symbol, it's public.
    If private and valued at over $1B, call it a "unicorn".
  - The company's latest valuation, in millions of dollars, if known.
@@ -65,7 +65,7 @@ Return these results as a valid JSON object, with the following keys and data ty
  """
 
 EMPLOYMENT_PROMPT = """
-For the company at {company_info.company_identifier}, find:
+For the company {company_info.company_identifier}, find:
     - the company's remote work policy
     - whether the company is currently hiring backend engineers
     - whether the company is hiring backend engineers with AI experience
@@ -82,7 +82,7 @@ Return these results as a valid JSON object, with the following keys and data ty
 """
 
 INTERVIEW_STYLE_PROMPT = """
-For the company at {company_info.company_identifier}, find:
+For the company {company_info.company_identifier}, find:
     - whether engineers are expected to do a systems design interview
     - whether engineers are expected to do a leetcode style coding interview
 """
@@ -95,7 +95,7 @@ Return these results as a valid JSON object, with the following keys and data ty
 """
 
 AI_MISSION_PROMPT = """
-Is the company at {company_info.company_identifier} a company that uses AI?
+Is the company {company_info.company_identifier} a company that uses AI?
 Look for blog posts, press releases, news articles, etc. about whether and how AI 
 is used for the company's products or services, whether as public-facing features or
 internal implementation. Another good clue is whether the company is hiring AI engineers.
