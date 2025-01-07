@@ -407,50 +407,64 @@ def add_company_to_spreadsheet(
     logger.info(f"Added company to spreadsheet: {company_info.name}")
 
 
-def main(args, loglevel: int = logging.INFO):
-    email_responder = EmailResponder(
-        reply_rag_model=args.model,
-        reply_rag_limit=args.limit,
-        loglevel=loglevel,
-    )
-    if args.test_messages:
-        new_recruiter_email = [
-            {"combined_content": msg, "internalDate": "0"} for msg in args.test_messages
-        ]
-    else:
-        logger.debug("Getting new recruiter messages...")
-        new_recruiter_email = email_responder.get_new_recruiter_messages(
-            max_results=args.limit
+class JobSearch:
+    """
+    Main entry points for this module.
+    """
+
+    def __init__(self, args: argparse.Namespace, loglevel: int):
+        self.args = args
+        self.loglevel = loglevel
+        self.email_responder = EmailResponder(
+            reply_rag_model=args.model,
+            reply_rag_limit=args.limit,
+            loglevel=loglevel,
         )
-        logger.debug("...Got new recruiter messages")
 
-    for i, msg in enumerate(new_recruiter_email):
-        logger.info(f"Processing message {i+1} of {len(new_recruiter_email)}...")
-        content = msg["combined_content"].strip()
-        if not content:
-            logger.warning("Empty message, skipping")
-            continue
+    def generate_reply(self, message: str) -> str:
+        return self.email_responder.generate_reply(message)
 
-        logger.info(
-            f"==============================\n\nProcessing message:\n\n{content}\n"
-        )
-        # TODO: pass subject too?
-        company_info = initial_research_company(content, model=args.model)
-        logger.debug(f"Company info after initial research: {company_info}\n\n")
-        generated_reply = email_responder.generate_reply(content)
-        logger.info(f"------ GENERATED REPLY:\n{generated_reply[:400]}\n\n")
-        if is_good_fit(company_info):
-            company_info = followup_research_company(company_info)
+    def main(self):
+        args = self.args
+        if args.test_messages:
+            new_recruiter_email = [
+                {"combined_content": msg, "internalDate": "0"}
+                for msg in args.test_messages
+            ]
+        else:
+            logger.debug("Getting new recruiter messages...")
+            new_recruiter_email = self.email_responder.get_new_recruiter_messages(
+                max_results=args.limit
+            )
+            logger.debug("...Got new recruiter messages")
 
-        reply = maybe_edit_reply(generated_reply)
-        logger.info(f"------ EDITED REPLY:\n{reply}\n\n")
-        send_reply(reply)
-        archive_message(msg)
-        add_company_to_spreadsheet(company_info, args)
-        logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
+        for i, msg in enumerate(new_recruiter_email):
+            logger.info(f"Processing message {i+1} of {len(new_recruiter_email)}...")
+            content = msg["combined_content"].strip()
+            if not content:
+                logger.warning("Empty message, skipping")
+                continue
+
+            logger.info(
+                f"==============================\n\nProcessing message:\n\n{content}\n"
+            )
+            # TODO: pass subject too?
+            company_info = initial_research_company(content, model=args.model)
+            logger.debug(f"Company info after initial research: {company_info}\n\n")
+            generated_reply = self.generate_reply(content)
+            logger.info(f"------ GENERATED REPLY:\n{generated_reply[:400]}\n\n")
+            if is_good_fit(company_info):
+                company_info = followup_research_company(company_info)
+
+            reply = maybe_edit_reply(generated_reply)
+            logger.info(f"------ EDITED REPLY:\n{reply}\n\n")
+            send_reply(reply)
+            archive_message(msg)
+            add_company_to_spreadsheet(company_info, args)
+            logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
 
 
-if __name__ == "__main__":
+def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Print verbose logging"
@@ -516,6 +530,12 @@ if __name__ == "__main__":
         default="prod",
         help="Use the test or production spreadsheet",
     )
+
+    return parser
+
+
+if __name__ == "__main__":
+    parser = arg_parser()
     args = parser.parse_args()
 
     setup_logging(args.verbose)
@@ -529,4 +549,5 @@ if __name__ == "__main__":
     cache_args.cache_until = args.cache_until
     cache_args.no_cache = args.no_cache
 
-    main(args, loglevel=logger.level)
+    job_searcher = JobSearch(args, loglevel=logger.level)
+    job_searcher.main()
