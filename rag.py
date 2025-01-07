@@ -101,17 +101,23 @@ class RecruitmentRAG:
             raise ValueError("Data not prepared. Call prepare_data() first.")
 
         TEMPERATURE = 0.2  # Lowish because we're writing email to real people.
-
+        TIMEOUT = 300
         if llm_type.lower() == "openai":
-            llm = ChatOpenAI(temperature=TEMPERATURE)
+            llm = ChatOpenAI(temperature=TEMPERATURE, timeout=TIMEOUT)
         elif llm_type.lower() == "claude":
             llm = ChatAnthropic(
-                model="claude-3-5-sonnet-20240620", temperature=TEMPERATURE
+                model="claude-3-5-sonnet-20240620",
+                temperature=TEMPERATURE,
+                timeout=TIMEOUT,
             )
         elif llm_type.startswith("gpt"):
             llm = ChatOpenAI(model=llm_type, temperature=TEMPERATURE)
         elif llm_type.startswith("claude"):
-            llm = ChatAnthropic(model=llm_type, temperature=TEMPERATURE)
+            llm = ChatAnthropic(
+                model=llm_type,
+                temperature=TEMPERATURE,
+                timeout=TIMEOUT,
+            )
         else:
             raise ValueError(f"Invalid llm_type. Choose 'openai' or 'claude' or 'gpt'.")
 
