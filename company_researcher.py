@@ -148,12 +148,16 @@ Return these results as a valid JSON object, with the following keys and data ty
  - recruiter_name: string or null
  - recruiter_contact: string or null
 """
+
+TEMPERATURE = 0.7
+TIMEOUT = 120
 class TavilyRAGResearchAgent:
 
     def __init__(self, verbose: bool = False, llm: Optional[object] = None):
-
         # set up the agent
-        self.llm = llm or ChatOpenAI(model_name="gpt-4", temperature=0.7)
+        self.llm = llm or ChatOpenAI(
+            model="gpt-4", temperature=TEMPERATURE, timeout=TIMEOUT
+        )
         # Cache to reduce LLM calls.
         set_llm_cache(SQLiteCache(database_path=".langchain-cache.db"))
         self.verbose = verbose
@@ -197,6 +201,8 @@ class TavilyRAGResearchAgent:
             )
             result = self.llm.invoke(full_prompt)
             # TODO: also use the recruiter's email, if there is one, not just name.
+            if not isinstance(result.content, str):
+                raise ValueError(f"Expected string content, got {type(result.content)}")
             return json.loads(result.content)
         except Exception as e:
             logger.error(f"Error extracting company info: {e}")
@@ -261,6 +267,10 @@ class TavilyRAGResearchAgent:
                 result = self.llm.invoke(full_prompt)
                 # TODO: Handle malformed JSON
                 try:
+                    if not isinstance(result.content, str):
+                        raise ValueError(
+                            f"Expected string content, got {type(result.content)}"
+                        )
                     content = json.loads(result.content)
                     logger.debug(f"  Content returned from llm:\n\n {content}\n\n")
                 except Exception as e:
@@ -339,9 +349,9 @@ def main(
     """
     TEMPERATURE = 0.7  # TBD what's a good range for this use case? Is this high?
     if model.startswith("gpt-"):
-        llm = ChatOpenAI(model_name=model, temperature=TEMPERATURE)
+        llm = ChatOpenAI(model=model, temperature=TEMPERATURE, timeout=TIMEOUT)
     elif model.startswith("claude"):
-        llm = ChatAnthropic(model_name=model, temperature=TEMPERATURE)
+        llm = ChatAnthropic(model=model, temperature=TEMPERATURE, timeout=TIMEOUT)
     else:
         raise ValueError(f"Unknown model: {model}")
 
