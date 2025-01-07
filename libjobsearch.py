@@ -8,6 +8,7 @@ import queue
 import re
 import subprocess
 import tempfile
+import time
 from collections import defaultdict
 from enum import IntEnum
 from functools import wraps
@@ -109,9 +110,10 @@ def _process_wrapper(func, args, kwargs, result_queue, error_queue):
         result_queue.put(result)
     except Exception as e:
         error_queue.put((type(e), str(e)))
+        result_queue.put(None)  # Signal completion even on error
 
 
-def run_in_process(func: Callable, *args, timeout=300, **kwargs) -> Any:
+def run_in_process(func: Callable, *args, timeout=120, **kwargs) -> Any:
     """
     Run a function in a separate process and return its result.
 
@@ -136,24 +138,23 @@ def run_in_process(func: Callable, *args, timeout=300, **kwargs) -> Any:
     process.start()
 
     try:
-        # Check error queue first
+        # Wait for result (will be None if there was an error)
         try:
-            exc_type, exc_msg = error_queue.get(timeout=timeout)
-            raise exc_type(exc_msg)
-        except TimeoutError:
-            pass
-        except queue.Empty:
-            pass
-
-        # If no error, get result
-        try:
-            return result_queue.get(timeout=timeout)
+            result = result_queue.get(timeout=timeout)
         except queue.Empty:
             raise TimeoutError(
                 f"Function {func.__name__} timed out after {timeout} seconds"
             )
 
+        # Check if there was an error
+        try:
+            exc_type, exc_msg = error_queue.get_nowait()
+            raise exc_type(exc_msg)
+        except queue.Empty:
+            return result
+
     finally:
+        time.sleep(0.5)
         if process.is_alive():
             logger.warning(f"Terminating still-running process {process.pid}...")
             process.terminate()
