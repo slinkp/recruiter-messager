@@ -190,13 +190,12 @@ def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
 
     logger.info("Finding salary data ...")
     now = datetime.datetime.now()
-    salary_data = run_in_process(levels_searcher.main, company_name=row.name)
-    if salary_data:
-        salary_data = list(salary_data)  # Convert generator to list if needed
+    salary_data = run_in_process(levels_searcher.main, company_name=row.name) or []
+    salary_data = list(salary_data)  # Convert generator to list if needed
 
     delta = datetime.datetime.now() - now
     logger.info(
-        f"Got {len(salary_data) if salary_data else 0} rows of salary data for {row.name} in {delta.seconds} seconds"
+        f"Got {len(salary_data)} rows of salary data for {row.name} in {delta.seconds} seconds"
     )
 
     if salary_data:

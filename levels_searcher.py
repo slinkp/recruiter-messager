@@ -330,10 +330,13 @@ class SalarySearcher:
         self.salary_table = self.page.locator(
             "table[aria-label='Salary Submissions']"
         ).first
-        if not self.salary_table.is_visible(timeout=5000):
-            raise RuntimeError(f"Could not find salary table on page {self.page.url}")
 
     def get_salary_data(self) -> Iterable[Dict]:
+        if not self.salary_table.is_visible(timeout=5000):
+            logger.warning(
+                f"Could not find salary table on page {self.page.url}, returning empty"
+            )
+            return []
         logger.info(f"Looking for salary table on {self.page.url}...")
         self._say_salary_data_added()
         self.random_delay()
