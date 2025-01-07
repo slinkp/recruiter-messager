@@ -5,7 +5,7 @@ import random
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, Iterable, List
 
 from playwright.sync_api import expect, sync_playwright
 
@@ -46,7 +46,7 @@ class LevelsFyiSearcher:
         )
         logger.info("Webdriver detection bypass added")
 
-    def main(self, company_name: str) -> List[Dict]:
+    def main(self, company_name: str) -> Iterable[Dict]:
         """Main function to search for salary data at a company"""
         # All of these work by side effects or raising exceptions
         self.search_by_company_name(company_name)
@@ -54,7 +54,7 @@ class LevelsFyiSearcher:
         # TODO: add levels extraction
         return self.find_and_extract_salaries()
 
-    def test_company_salary(self, company_salary_url: str) -> List[Dict]:
+    def test_company_salary(self, company_salary_url: str) -> Iterable[Dict]:
         """Test method that loads salary data when we already have the URL"""
         logger.info(f"Running test for {company_salary_url}")
         self.page.goto(company_salary_url)
@@ -86,7 +86,7 @@ class LevelsFyiSearcher:
         logger.debug(f"Waiting for {delay:.1f} seconds...")
         time.sleep(delay)
 
-    def find_and_extract_salaries(self) -> List[Dict]:
+    def find_and_extract_salaries(self) -> Iterable[Dict]:
         self._navigate_to_salary_page()
         searcher = SalarySearcher(self.page)
         return searcher.get_salary_data()
@@ -333,7 +333,7 @@ class SalarySearcher:
         if not self.salary_table.is_visible(timeout=5000):
             raise RuntimeError(f"Could not find salary table on page {self.page.url}")
 
-    def get_salary_data(self):
+    def get_salary_data(self) -> Iterable[Dict]:
         logger.info(f"Looking for salary table on {self.page.url}...")
         self._say_salary_data_added()
         self.random_delay()
@@ -341,7 +341,9 @@ class SalarySearcher:
         for row in self._extract_salary_data():
             yield self._postprocess_salary_row(row)
 
-    def random_delay(self, min_seconds=0.6, max_seconds=3):
+    def random_delay(
+        self, min_seconds: float | int = 0.6, max_seconds: float | int = 3.0
+    ):
         """Add a random delay between actions"""
         delay = random.uniform(min_seconds, max_seconds)
         logger.debug(f"Waiting for {delay:.1f} seconds...")
@@ -884,6 +886,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    company_salary_url = ""
+
     if args.test_levels_extraction:
         assert args.company, "Company name must be provided for levels extraction"
         result = extract_levels(args.company)
@@ -891,8 +896,6 @@ if __name__ == "__main__":
         sys.exit(0)
     elif args.test:
         company_salary_url = "https://www.levels.fyi/companies/shopify/salaries/software-engineer?country=43"
-    else:
-        company_salary_url = None
 
     for i, result in enumerate(main(args.company, company_salary_url)):
         print(f"{i+1}:")
