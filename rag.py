@@ -101,7 +101,7 @@ class RecruitmentRAG:
             raise ValueError("Data not prepared. Call prepare_data() first.")
 
         TEMPERATURE = 0.2  # Lowish because we're writing email to real people.
-        TIMEOUT = 300
+        TIMEOUT = 120
         if llm_type.lower() == "openai":
             llm = ChatOpenAI(temperature=TEMPERATURE, timeout=TIMEOUT)
         elif llm_type.lower() == "claude":
