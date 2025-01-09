@@ -19,8 +19,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-import models
-
 logger = logging.getLogger(__name__)
 
 HERE = os.path.dirname(os.path.abspath(__file__))

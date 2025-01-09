@@ -1,11 +1,11 @@
+import argparse
 import logging
 import signal
 import time
-import models
-import argparse
-from logsetup import setup_logging
 
 import libjobsearch
+import models
+from logsetup import setup_logging
 from tasks import TaskStatus, task_manager
 
 logger = logging.getLogger(__name__)

@@ -1,12 +1,11 @@
-from playwright.sync_api import (
-    sync_playwright,
-    TimeoutError as PlaywrightTimeout,
-)
 import os
-from typing import List, Dict
-from datetime import datetime
-import time
 import random
+import time
+from datetime import datetime
+from typing import Dict, List
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
+from playwright.sync_api import sync_playwright
 
 
 class LinkedInSearcher:

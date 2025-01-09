@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Dict, Iterable, List
 
-from playwright.sync_api import expect, sync_playwright
+from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 

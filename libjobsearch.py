@@ -15,17 +15,18 @@ from enum import IntEnum
 from functools import wraps
 from multiprocessing import Process, Queue
 from typing import Any, Callable
+
 from diskcache import Cache
 
-import spreadsheet_client
 import company_researcher
 import email_client
 import levels_searcher
 import linkedin_searcher
-from spreadsheet_client import MainTabCompaniesClient
+import spreadsheet_client
+from logsetup import setup_logging
 from models import CompaniesSheetRow
 from rag import RecruitmentRAG
-from logsetup import setup_logging
+from spreadsheet_client import MainTabCompaniesClient
 
 logger = logging.getLogger(__name__)
 
