@@ -6,9 +6,29 @@ import time
 import libjobsearch
 import models
 from logsetup import setup_logging
-from tasks import TaskStatus, TaskType, task_manager
+from tasks import TaskManager, TaskStatus, TaskType, task_manager
 
 logger = logging.getLogger(__name__)
+
+
+class TaskStatusContext:
+
+    def __init__(self, task_mgr: TaskManager, task_id: str, task_type: TaskType):
+        self.task_mgr = task_mgr
+        self.task_id = task_id
+        self.task_type = task_type
+
+    def __enter__(self):
+        self.task_mgr.update_task(self.task_id, TaskStatus.RUNNING)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            self.task_mgr.update_task(self.task_id, TaskStatus.COMPLETED)
+        else:
+            self.task_mgr.update_task(
+                self.task_id, TaskStatus.FAILED, error=str(exc_value)
+            )
 
 
 class ResearchDaemon:
@@ -42,28 +62,21 @@ class ResearchDaemon:
         self.running = False
 
     def process_next_task(self):
-        # Use the task manager's connection settings
         row = self.task_mgr.get_next_pending_task()
 
         if row:
             task_id, task_type, task_args = row
-            try:
-                logger.info(
-                    f"Processing task {task_id} of type {task_type} with args:\n{task_args}"
-                )
+            logger.info(
+                f"Processing task {task_id} of type {task_type} with args:\n{task_args}"
+            )
+            with TaskStatusContext(self.task_mgr, task_id, task_type):
                 if task_type == TaskType.COMPANY_RESEARCH:
-                    self.task_mgr.update_task(task_id, TaskStatus.RUNNING)
                     self.do_research(task_args)
+                elif task_type == TaskType.GENERATE_REPLY:
+                    self.do_generate_reply(task_args)
                 else:
-                    raise ValueError(f"Unknown task type: {task_type}")
-                self.task_mgr.update_task(
-                    task_id, TaskStatus.COMPLETED, result={"some": "data"}
-                )
+                    logger.error(f"Ignoring unsupported task type: {task_type}")
                 logger.info(f"Task {task_id} completed")
-
-            except Exception as e:
-                logger.exception(f"Task {task_id} failed")
-                self.task_mgr.update_task(task_id, TaskStatus.FAILED, error=str(e))
 
     def do_research(self, args: dict):
         company_name = args["company_name"]
@@ -82,6 +95,12 @@ class ResearchDaemon:
         company_row = self.jobsearch.research_company(content, model=MODEL)
         company = models.Company(name=company_name, details=company_row)
         self.company_repo.create(company)
+
+    def do_generate_reply(self, args: dict):
+        # TODO: Use LLM to generate reply
+        assert "company_name" in args
+        logger.info(f"Generating reply for {args['company_name']}")
+        return f"Stub reply for {args['company_name']}"
 
 
 if __name__ == "__main__":
