@@ -151,6 +151,8 @@ Return these results as a valid JSON object, with the following keys and data ty
 
 TEMPERATURE = 0.7
 TIMEOUT = 120
+
+
 class TavilyRAGResearchAgent:
 
     def __init__(self, verbose: bool = False, llm: Optional[object] = None):
@@ -367,7 +369,7 @@ def main(
         return researcher.main(message=url_or_message)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
     import sys
 
@@ -412,6 +414,7 @@ if __name__ == '__main__':
         is_url=is_url,
     )
     import pprint
+
     pprint.pprint(data)
 
 

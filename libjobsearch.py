@@ -17,12 +17,12 @@ from multiprocessing import Process, Queue
 from typing import Any, Callable
 from diskcache import Cache
 
-import companies_spreadsheet
+import spreadsheet_client
 import company_researcher
 import email_client
 import levels_searcher
 import linkedin_searcher
-from companies_spreadsheet import MainTabCompaniesClient
+from spreadsheet_client import MainTabCompaniesClient
 from models import CompaniesSheetRow
 from rag import RecruitmentRAG
 from logsetup import setup_logging
@@ -318,9 +318,9 @@ def add_company_to_spreadsheet(
 ):
     logger.info(f"Adding company to spreadsheet: {company_info.name}")
     if args.sheet == "test":
-        config = companies_spreadsheet.TestConfig
+        config = spreadsheet_client.TestConfig
     else:
-        config = companies_spreadsheet.Config
+        config = spreadsheet_client.Config
     client = MainTabCompaniesClient(
         doc_id=config.SHEET_DOC_ID,
         sheet_id=config.TAB_1_GID,
