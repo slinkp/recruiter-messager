@@ -228,19 +228,26 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 class CompanyRepository:
 
-    def __init__(self, db_path: str = "data/companies.db"):
+    def __init__(
+        self,
+        db_path: str = "data/companies.db",
+        load_sample_data: bool = False,
+        clear_data: bool = False,
+    ):
         self.db_path = db_path
         self.lock = multiprocessing.Lock()
         self._ensure_db_dir()
-        self._init_db()
+        self._init_db(load_sample_data, clear_data)
 
     def _ensure_db_dir(self):
         """Ensure the database directory exists."""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-    def _init_db(self):
+    def _init_db(self, load_sample_data: bool, clear_data: bool):
         with self.lock:
             with self._get_connection() as conn:
+                if clear_data:
+                    conn.execute("DROP TABLE IF EXISTS companies")
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS companies (
@@ -251,27 +258,9 @@ class CompanyRepository:
                     )
                 """
                 )
-
-                # Initialize with sample data if table is empty
-                cursor = conn.execute("SELECT COUNT(*) FROM companies")
-                if cursor.fetchone()[0] == 0:
-                    for company in SAMPLE_COMPANIES:
-                        conn.execute(
-                            """
-                            INSERT INTO companies 
-                            (name, details, initial_message, reply_message) 
-                            VALUES (?, ?, ?, ?)
-                            """,
-                            (
-                                company.name,
-                                json.dumps(
-                                    company.details.model_dump(), cls=CustomJSONEncoder
-                                ),
-                                company.initial_message,
-                                company.reply_message,
-                            ),
-                        )
-                conn.commit()
+        if load_sample_data:
+            for company in SAMPLE_COMPANIES:
+                self.create(company)
 
     @contextmanager
     def _get_connection(self):
@@ -408,10 +397,19 @@ SAMPLE_COMPANIES = [
 _company_repository = None
 
 
-def company_repository() -> CompanyRepository:
+def company_repository(
+    db_path: str = "data/companies.db",
+    load_sample_data: bool = False,
+    clear_data: bool = False,
+) -> CompanyRepository:
+    # This is a bit hacky: the args only matter when creating the singleton
     global _company_repository
     if _company_repository is None:
-        _company_repository = CompanyRepository()
+        _company_repository = CompanyRepository(
+            db_path=db_path,
+            load_sample_data=load_sample_data,
+            clear_data=clear_data,
+        )
     return _company_repository
 
 
@@ -423,3 +421,14 @@ def serialize_company(company: Company):
         if v is not None
     }
     return data
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--clear-data", action="store_true", help="Clear existing data")
+    parser.add_argument("--sample-data", action="store_true", help="Load sample data")
+    args = parser.parse_args()
+
+    company_repository(clear_data=args.clear_data, load_sample_data=args.sample_data)
