@@ -1,18 +1,15 @@
-from datetime import date, datetime
-from pyramid.config import Configurator
-from pyramid.response import Response
-from pyramid.view import view_config
-from pyramid.scripts.pserve import PServeCommand
-import os
 import json
-from pydantic import BaseModel
-from typing import Dict, List, Optional
-
-
 import logging
-from colorama import Fore, Style
+import os
+from datetime import datetime
+
 import colorama
+from colorama import Fore, Style
+from pyramid.config import Configurator
 from pyramid.renderers import JSON
+from pyramid.response import Response
+from pyramid.scripts.pserve import PServeCommand
+from pyramid.view import view_config
 
 import models
 import tasks
@@ -130,7 +127,10 @@ def research_company(request):
         return {"error": "Company not found"}
 
     # Create a new task
-    task_id = tasks.task_manager().create_task(company_name)
+    task_id = tasks.task_manager().create_task(
+        tasks.TaskType.COMPANY_RESEARCH,
+        {"company_name": company_name},
+    )
     logger.info(f"Research requested for {company_name}, task_id: {task_id}")
 
     return {"task_id": task_id, "status": tasks.TaskStatus.PENDING.value}

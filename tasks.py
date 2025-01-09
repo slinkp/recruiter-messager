@@ -1,5 +1,5 @@
 """
-State management for company research as "tasks".
+State management for company research and other actions as asynhronous"tasks".
 
 The TaskManager class is designed to be used as a singleton, and the task_manager()
 function is provided to get the singleton instance.
@@ -7,6 +7,12 @@ function is provided to get the singleton instance.
 This module provides a TaskManager class to create, update, and retrieve tasks.
 Tasks are stored in a SQLite database, and the TaskManager class provides methods
 to interact with the database.
+
+Why not use a task queue eg Celery or distributed queue like RabbitMQ?
+- It's more infrastructure and complexity than we need
+- We aren't concerned about volume
+- Queues force you to solve for visibility, retries, transactionality, etc
+- Using a simple database gives you visibility and transactions for free
 """
 
 import json
@@ -32,19 +38,31 @@ class TaskStatus(Enum):
     FAILED = "failed"
 
 
+class TaskType(Enum):
+    COMPANY_RESEARCH = "company_research"
+    GENERATE_REPLY = "generate_reply"
+
+
 class TaskManager:
-    def __init__(self, db_path: str = DEFAULT_DB_PATH):
+
+    def __init__(self, db_path: str = DEFAULT_DB_PATH, reset_db: bool = False):
         self.db_path = db_path
         self.lock = multiprocessing.Lock()
-        self._init_db()
+        self._init_db(reset_db)
 
-    def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS tasks (
+    def _init_db(self, reset_db: bool = False):
+        with self.lock:
+            with sqlite3.connect(self.db_path) as conn:
+                if reset_db:
+                    logger.info("Deleting existing tasks table if it exists")
+                    conn.execute("DROP TABLE IF EXISTS tasks")
+                logger.info("Creating tasks table if it doesn't exist")
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS tasks (
                     id TEXT PRIMARY KEY,
-                    company_name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    args TEXT NOT NULL,
                     status TEXT NOT NULL,
                     result TEXT,
                     error TEXT,
@@ -52,9 +70,9 @@ class TaskManager:
                     updated_at TEXT NOT NULL
                 )
             """
-            )
+                )
 
-    def create_task(self, company_name: str) -> str:
+    def create_task(self, task_type: TaskType, args: dict) -> str:
         task_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
 
@@ -62,10 +80,17 @@ class TaskManager:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
                     """
-                    INSERT INTO tasks (id, company_name, status, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO tasks (id, type, args, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (task_id, company_name, TaskStatus.PENDING.value, now, now),
+                    (
+                        task_id,
+                        task_type.value,
+                        json.dumps(args),
+                        TaskStatus.PENDING.value,
+                        now,
+                        now,
+                    ),
                 )
         return task_id
 
@@ -78,12 +103,13 @@ class TaskManager:
         if row:
             return {
                 "id": row[0],
-                "company_name": row[1],
-                "status": row[2],
-                "result": json.loads(row[3]) if row[3] else None,
-                "error": row[4],
-                "created_at": row[5],
-                "updated_at": row[6],
+                "type": TaskType(row[1]),
+                "args": json.loads(row[2]),
+                "status": TaskStatus(row[3]),
+                "result": json.loads(row[4]) if row[4] else None,
+                "error": row[5],
+                "created_at": row[6],
+                "updated_at": row[7],
             }
         return None
 
@@ -111,12 +137,12 @@ class TaskManager:
                     ),
                 )
 
-    def get_next_pending_task(self) -> Optional[tuple[str, str]]:
+    def get_next_pending_task(self) -> Optional[tuple[str, TaskType, dict]]:
         with self.lock:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute(
                     """
-                    SELECT id, company_name FROM tasks 
+                    SELECT id, type, args FROM tasks 
                     WHERE status = ? 
                     ORDER BY created_at ASC 
                      LIMIT 1
@@ -124,7 +150,14 @@ class TaskManager:
                     (TaskStatus.PENDING.value,),
                 )
                 row = cursor.fetchone()
-        return row
+                if row is None:
+                    return None
+                task_id, task_type, task_args = row
+                task_id = str(task_id)
+                task_type = TaskType(task_type)
+                task_args = json.loads(task_args)
+                assert isinstance(task_args, dict)
+                return task_id, task_type, task_args
 
 
 # Module-level singleton
@@ -136,3 +169,13 @@ def task_manager() -> TaskManager:
     if _task_manager is None:
         _task_manager = TaskManager()
     return _task_manager
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reset-db", action="store_true")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
+    TaskManager(reset_db=args.reset_db)

@@ -6,7 +6,7 @@ import time
 import libjobsearch
 import models
 from logsetup import setup_logging
-from tasks import TaskStatus, task_manager
+from tasks import TaskStatus, TaskType, task_manager
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +46,16 @@ class ResearchDaemon:
         row = self.task_mgr.get_next_pending_task()
 
         if row:
-            task_id, company_name = row
+            task_id, task_type, task_args = row
             try:
-                logger.info(f"Processing task {task_id} for {company_name}")
-                self.task_mgr.update_task(task_id, TaskStatus.RUNNING)
-                self.do_research(company_name)
+                logger.info(
+                    f"Processing task {task_id} of type {task_type} with args:\n{task_args}"
+                )
+                if task_type == TaskType.COMPANY_RESEARCH:
+                    self.task_mgr.update_task(task_id, TaskStatus.RUNNING)
+                    self.do_research(task_args)
+                else:
+                    raise ValueError(f"Unknown task type: {task_type}")
                 self.task_mgr.update_task(
                     task_id, TaskStatus.COMPLETED, result={"some": "data"}
                 )
@@ -60,7 +65,8 @@ class ResearchDaemon:
                 logger.exception(f"Task {task_id} failed")
                 self.task_mgr.update_task(task_id, TaskStatus.FAILED, error=str(e))
 
-    def do_research(self, company_name: str):
+    def do_research(self, args: dict):
+        company_name = args["company_name"]
         existing = self.company_repo.get(company_name)
         content = company_name
         if existing:

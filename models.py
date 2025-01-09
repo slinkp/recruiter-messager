@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import enum
 import json
 import multiprocessing
 import os
@@ -216,10 +217,12 @@ class Company(BaseModel):
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, datetime.date):
+        if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
         if isinstance(obj, decimal.Decimal):
             return str(obj)
+        if isinstance(obj, enum.Enum):
+            return obj.value
         return super().default(obj)
 
 
