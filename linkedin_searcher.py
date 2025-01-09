@@ -118,7 +118,6 @@ class LinkedInSearcher:
         Search for 1st-degree connections at specified company.
         Returns list of found connections with their details.
         """
-        connections = []
         try:
             # Navigate to network-filtered search (starting with just network filter)
             search_url = (
@@ -141,28 +140,43 @@ class LinkedInSearcher:
             self._wait()
             self.screenshot("after_entering_company")
 
-            # Wait for and click the company name option
-            company_option = (
-                self.page.locator("div[role='option']")
-                .filter(has_text=company)
-                .filter(has_text="Company • ")  # Company type always includes this,
-                # but maybe not always "Company • Software Development"
-                .first
-            )
-            show_results = self.page.get_by_role("button", name="Show results").first
+            print("Waiting for company option to be visible...")
+            for text in ["Company • Software Development", "Company • "]:
+                company_option = (
+                    self.page.locator("div[role='option']")
+                    .filter(has_text=company)
+                    .filter(has_text=text)
+                    .first
+                )
+                try:
+                    company_option.wait_for(state="visible", timeout=5000)
+                    break
+                except PlaywrightTimeout:
+                    company_option = None
+                    continue
 
-            print("Waiting for company option and Show results to be visible...")
-            company_option.wait_for(state="visible", timeout=5000)
-            company_option.click()
+            if company_option is None:
+                print(f"Company option not found for {company}")
+                self.screenshot("company_option_not_found")
+                return []
+            else:
+                company_option.click()
+
             self._wait()
             self.screenshot("after_clicking_company_option")
 
-            show_results.wait_for(state="visible", timeout=5000)
-
-            # Click Show results directly (it should use the currently highlighted option)
-            print("Clicking Show results button...")
-            show_results.click()
-            self._wait()
+            print("Waiting for Show results button to be visible...")
+            show_results = self.page.get_by_role("button", name="Show results").first
+            try:
+                show_results.wait_for(state="visible", timeout=5000)
+                # Click Show results directly (it should use the currently highlighted option)
+                print("Clicking Show results button...")
+                show_results.click()
+                self._wait()
+            except PlaywrightTimeout:
+                print("Show results button not found")
+                self.screenshot("show_results_button_not_found")
+                return []
 
             self.screenshot("after_clicking_show_results")
 
@@ -183,19 +197,21 @@ class LinkedInSearcher:
                     f"debug_page_content_{datetime.now():%Y%m%d_%H%M%S}.html", "w"
                 ) as f:
                     f.write(self.page.content())
-                raise
+                print("Results container missing")
+                return []
 
             self.screenshot("post_wait")
 
             # Check for no results first
             no_results = self.page.get_by_text("No results found")
             if no_results.is_visible():
-                print(f"No connections found at {company}")
-                return connections
+                print(f"Linkedin found no connections at {company}")
+                return []
 
             # Get all result cards within search results container
             results = results_container.get_by_role("list").first.locator("li")
             count = results.count()
+            connections = []
 
             for i in range(count):
                 result = results.nth(i)
