@@ -1,4 +1,5 @@
 import argparse
+import dataclasses
 import datetime
 import decimal
 import logging
@@ -41,11 +42,12 @@ class CacheStep(IntEnum):
     REPLY = 4
 
 
+@dataclasses.dataclass
 class CacheSettings:
-    no_cache = False
-    clear_cache = None
-    cache_until = None
-    clear_all_cache = False
+    no_cache: bool = False
+    clear_cache: list[CacheStep] = dataclasses.field(default_factory=list)
+    cache_until: CacheStep | None = None
+    clear_all_cache: bool = False
 
     def should_cache_step(self, step: CacheStep) -> bool:
         if self.no_cache:
@@ -57,9 +59,9 @@ class CacheSettings:
     def should_clear_cache(self, step: CacheStep) -> bool:
         if self.clear_all_cache:
             return True
-        if not self.clear_cache:
-            return False
-        return step in self.clear_cache
+        if self.clear_cache:
+            return step in self.clear_cache
+        return False
 
 
 # TODO: Redesign this to not be global
