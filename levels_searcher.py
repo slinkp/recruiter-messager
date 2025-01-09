@@ -11,6 +11,11 @@ from playwright.sync_api import expect, sync_playwright
 
 logger = logging.getLogger(__name__)
 
+
+class NotFoundError(RuntimeError):
+    pass
+
+
 class LevelsFyiSearcher:
     def __init__(self):
         logger.info("Initializing LevelsFyiSearcher")
@@ -87,14 +92,28 @@ class LevelsFyiSearcher:
         time.sleep(delay)
 
     def find_and_extract_salaries(self) -> Iterable[Dict]:
-        self._navigate_to_salary_page()
-        searcher = SalarySearcher(self.page)
-        return searcher.get_salary_data()
+        try:
+            self._navigate_to_salary_page()
+        except NotFoundError as e:
+            logger.error(str(e))
+            return []
+        try:
+            searcher = SalarySearcher(self.page)
+            return searcher.get_salary_data()
+        except Exception as e:
+            logger.error(f"Error finding and extracting salaries: {e}")
+            return []
 
     def find_and_extract_levels(self, company_name: str):
-        self._navigate_to_comparison_page(company_name)
-        extractor = LevelsExtractor(self.page)
-        return extractor.find_and_extract_levels()
+        try:
+            self._navigate_to_comparison_page(company_name)
+            extractor = LevelsExtractor(self.level_container)
+            return extractor.find_and_extract_levels()
+        except NotFoundError as e:
+            logger.error(f"Error finding and extracting levels: {e}")
+            return []
+        except Exception:
+            raise
 
     def check_login_status(self) -> bool:
         """Check if we're logged in"""
@@ -313,7 +332,7 @@ class LevelsFyiSearcher:
             self.random_delay()  # Wait for navigation
         else:
             self.page.screenshot(path="swe_link_not_visible.png")
-            raise RuntimeError(
+            raise NotFoundError(
                 f"Software Engineer link not visible on page {self.page.url}. See screenshot swe_link_not_visible.png"
             )
 
@@ -321,6 +340,12 @@ class LevelsFyiSearcher:
         """Find the company comparison page"""
         url = f"https://www.levels.fyi/?compare={company_name},Shopify&track=Software%20Engineer"
         self.page.goto(url)
+        self.level_container = self.page.locator("#levelContainer").first
+        if not self.level_container.is_visible(timeout=5000):
+            self.page.screenshot(path="level_container_not_visible.png")
+            raise NotFoundError(
+                f"No level container. Current URL: {self.page.url}. See screenshot level_container_not_visible.png"
+            )
 
 
 class SalarySearcher:
@@ -688,24 +713,21 @@ class SalarySearcher:
 
 
 class LevelsExtractor:
-    def __init__(self, page):
-        self.page = page
+
+    def __init__(self, level_container):
+        self.level_container = level_container
 
     def find_and_extract_levels(self) -> List[str]:
         """Extract job level information from the comparison tables."""
         logger.info("Extracting job level information...")
-
-        # Find the level container div
-        level_container = self.page.locator("#levelContainer").first
-        if not level_container.is_visible(timeout=5000):
-            self.page.screenshot(path="level_container_not_visible.png")
-            logger.error(f"No level container. Current URL: {self.page.url}")
-            return []  # Return empty list instead of raising
-
-        # Find both company columns
-        company_cols = level_container.locator(".level-col").all()
+        # Find the level container div and both company columns
+        if self.level_container is None:
+            return []
+        company_cols = self.level_container.locator(".level-col").all()
         if len(company_cols) != 2:
-            raise RuntimeError(f"Expected 2 company columns, found {len(company_cols)}")
+            raise NotFoundError(
+                f"Expected 2 company columns, found {len(company_cols)}"
+            )
 
         results = []
         for col in company_cols:
