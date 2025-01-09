@@ -15,12 +15,12 @@ import re
 from diskcache import Cache
 from colorama import Fore, Style
 
-import companies_spreadsheet
+import spreadsheet_client
 import company_researcher
 import email_client
 import levels_searcher
 import linkedin_searcher
-from companies_spreadsheet import CompaniesSheetRow, MainTabCompaniesClient
+from spreadsheet_client import CompaniesSheetRow, MainTabCompaniesClient
 from rag import RecruitmentRAG
 
 logger = logging.getLogger(__name__)
@@ -350,9 +350,9 @@ def add_company_to_spreadsheet(
 ):
     logger.info(f"Adding company to spreadsheet: {company_info.name}")
     if args.sheet == "test":
-        config = companies_spreadsheet.TestConfig
+        config = spreadsheet_client.TestConfig
     else:
-        config = companies_spreadsheet.Config
+        config = spreadsheet_client.Config
     client = MainTabCompaniesClient(
         doc_id=config.SHEET_DOC_ID,
         sheet_id=config.TAB_1_GID,

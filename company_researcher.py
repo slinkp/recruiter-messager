@@ -14,7 +14,7 @@ from langchain_core.globals import set_llm_cache
 from langchain_openai import ChatOpenAI
 from tavily import TavilyClient
 
-from companies_spreadsheet import CompaniesSheetRow
+from spreadsheet_client import CompaniesSheetRow
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
