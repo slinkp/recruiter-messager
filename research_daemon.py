@@ -20,7 +20,7 @@ class ResearchDaemon:
         self.task_mgr = task_manager()
         self.company_repo = models.company_repository()
         self.jobsearch = libjobsearch.JobSearch(
-            args, loglevel=logging.DEBUG
+            args, loglevel=logging.DEBUG, cache_settings=cache_settings
         )
 
     def start(self):

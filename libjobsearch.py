@@ -64,16 +64,13 @@ class CacheSettings:
         return False
 
 
-# TODO: Redesign this to not be global
-cache_args = CacheSettings()
-
 def disk_cache(step: CacheStep):
-
     def decorator(func):
         @wraps(func)
-        def wrapper(*args, **kwargs):
-            use_cache = cache_args.should_cache_step(step)
-            clear_cache = cache_args.should_clear_cache(step)
+        def wrapper(self, *args, **kwargs):
+            # Get cache settings from instance
+            use_cache = self.cache_settings.should_cache_step(step)
+            clear_cache = self.cache_settings.should_clear_cache(step)
 
             # Remove memory addresses from string representations
             args_str = re.sub(r" at 0x[0-9a-fA-F]+", "", str(args))
@@ -93,7 +90,7 @@ def disk_cache(step: CacheStep):
 
             if result is None:
                 logger.debug(f"No cached result, running function for {key}...")
-                result = func(*args, **kwargs)
+                result = func(self, *args, **kwargs)
                 logger.debug(f"... Ran function for {key}")
             if use_cache:
                 cache.set(key, result)
@@ -221,8 +218,15 @@ def archive_message(msg: Any):
 
 class EmailResponder:
 
-    def __init__(self, reply_rag_model: str, reply_rag_limit: int, loglevel: int):
+    def __init__(
+        self,
+        reply_rag_model: str,
+        reply_rag_limit: int,
+        loglevel: int,
+        cache_settings: CacheSettings,
+    ):
         logger.info("Initializing EmailResponder...")
+        self.cache_settings = cache_settings
         self.reply_rag_model = reply_rag_model
         self.reply_rag_limit = reply_rag_limit
         self.loglevel = loglevel
@@ -237,7 +241,9 @@ class EmailResponder:
     ) -> RecruitmentRAG:  # Set up the RAG pipeline
         logger.info("Building RAG...")
         rag = RecruitmentRAG(old_messages, loglevel=self.loglevel)
-        clear_rag_context = cache_args.should_clear_cache(CacheStep.RAG_CONTEXT)
+        clear_rag_context = self.cache_settings.should_clear_cache(
+            CacheStep.RAG_CONTEXT
+        )
         if clear_rag_context:
             logger.info("Rebuilding RAG data from scratch...")
         else:
@@ -331,17 +337,17 @@ class JobSearch:
     Main entry points for this module.
     """
 
-    def __init__(self, args: argparse.Namespace, loglevel: int):
+    def __init__(
+        self, args: argparse.Namespace, loglevel: int, cache_settings: CacheSettings
+    ):
         self.args = args
-        self.loglevel = loglevel
         self.email_responder = EmailResponder(
             reply_rag_model=args.model,
             reply_rag_limit=args.limit,
             loglevel=loglevel,
+            cache_settings=cache_settings,
         )
-
-    def generate_reply(self, message: str) -> str:
-        return self.email_responder.generate_reply(message)
+        self.cache_settings = cache_settings
 
     def main(self):
         args = self.args
@@ -561,11 +567,13 @@ if __name__ == "__main__":
     if args.clear_all_cache:
         logger.info("Clearing all cache...")
         cache.clear()
-    # Update the global cache settings.
-    cache_args.clear_all_cache = args.clear_all_cache
-    cache_args.clear_cache = args.clear_cache
-    cache_args.cache_until = args.cache_until
-    cache_args.no_cache = args.no_cache
 
-    job_searcher = JobSearch(args, loglevel=logger.level)
+    cache_settings = CacheSettings(
+        clear_all_cache=args.clear_all_cache,
+        clear_cache=args.clear_cache,
+        cache_until=args.cache_until,
+        no_cache=args.no_cache,
+    )
+
+    job_searcher = JobSearch(args, loglevel=logger.level, cache_settings=cache_settings)
     job_searcher.main()
