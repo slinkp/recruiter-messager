@@ -145,7 +145,8 @@ class LinkedInSearcher:
             company_option = (
                 self.page.locator("div[role='option']")
                 .filter(has_text=company)
-                .filter(has_text="Company • Software Development")
+                .filter(has_text="Company • ")  # Company type always includes this,
+                # but maybe not always "Company • Software Development"
                 .first
             )
             show_results = self.page.get_by_role("button", name="Show results").first
