@@ -318,7 +318,7 @@ class LevelsFyiSearcher:
             )
 
     def _navigate_to_comparison_page(self, company_name: str):
-        """Test method that extracts levels from the company comparison page"""
+        """Find the company comparison page"""
         url = f"https://www.levels.fyi/?compare={company_name},Shopify&track=Software%20Engineer"
         self.page.goto(url)
 

@@ -226,7 +226,7 @@ class TavilyRAGResearchAgent:
         )
         return context
 
-    def main(self, *, url: str = None, message: str = None) -> CompaniesSheetRow:
+    def main(self, *, url: str = "", message: str = "") -> CompaniesSheetRow:
         """
         Research a company based on either a URL or a recruiter message.
         One of url or message must be provided.
