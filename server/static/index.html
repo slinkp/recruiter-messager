@@ -33,7 +33,22 @@
                     </span>
                 </div>
                 <template x-if="company.initial_message && !company.reply_message">
-                    <button @click="generateReply(company)">Generate reply</button>
+                    <button 
+                        @click="generateReply(company)"
+                        :disabled="isGeneratingMessage(company)"
+                    >
+                        <span x-text="isGeneratingMessage(company) ? 'Generating...' : 'Generate reply'"></span>
+                        <span x-show="isGeneratingMessage(company)" class="loading-spinner"></span>
+                    </button>
+                </template>
+                <template x-if="company.message_status">
+                    <span 
+                        x-text="getMessageStatusText(company)"
+                        :class="{'status-pending': company.message_status === 'pending', 
+                                'status-running': company.message_status === 'running',
+                                'status-completed': company.message_status === 'completed',
+                                'status-failed': company.message_status === 'failed'}"
+                    ></span>
                 </template>
                 <template x-if="company.reply_message">
                     <div>

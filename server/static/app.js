@@ -5,6 +5,7 @@ document.addEventListener('alpine:init', () => {
         editingCompany: null,
         editingReply: '',
         researchingCompanies: new Set(),
+        generatingMessages: new Set(),
         
         async init() {
             this.loading = true;
@@ -20,14 +21,20 @@ document.addEventListener('alpine:init', () => {
 
         async generateReply(company) {
             try {
+                this.generatingMessages.add(company.name);
                 const response = await fetch(`/api/${company.name}/reply_message`, {
                     method: 'POST',
                 });
                 
                 const data = await response.json();
-                company.reply_message = data.message;
+                company.message_task_id = data.task_id;
+                company.message_status = data.status;
+                
+                // Start polling for updates
+                this.pollMessageStatus(company);
             } catch (err) {
                 console.error('Failed to generate reply:', err);
+                this.generatingMessages.delete(company.name);
             }
         },
 
@@ -87,52 +94,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         async pollResearchStatus(company) {
-            while (this.researchingCompanies.has(company.name)) {
-                try {
-                    const response = await fetch(`/api/research/${company.research_task_id}`);
-                    const task = await response.json();
-                    
-                    company.research_status = task.status;
-                    
-                    if (task.status === 'completed') {
-                        // Update company with research results
-                        if (task.result) {
-                            Object.assign(company, task.result);
-                        }
-                        this.researchingCompanies.delete(company.name);
-                        break;
-                    } else if (task.status === 'failed') {
-                        company.research_error = task.error;
-                        this.researchingCompanies.delete(company.name);
-                        break;
-                    }
-                    
-                    // Wait before polling again
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                } catch (err) {
-                    console.error('Failed to poll research status:', err);
-                    this.researchingCompanies.delete(company.name);
-                    break;
-                }
-            }
+            return this.pollTaskStatus(company, 'research');
         },
 
         getResearchStatusText(company) {
-            if (company.research_error) {
-                return `Research failed: ${company.research_error}`;
-            }
-            switch (company.research_status) {
-                case 'pending':
-                    return 'Research pending...';
-                case 'running':
-                    return 'Researching...';
-                case 'completed':
-                    return 'Research complete';
-                case 'failed':
-                    return 'Research failed';
-                default:
-                    return '';
-            }
+            return this.getTaskStatusText(company, 'research');
         },
 
         getResearchStatusClass(company) {
@@ -146,6 +112,78 @@ document.addEventListener('alpine:init', () => {
 
         isResearching(company) {
             return this.researchingCompanies.has(company.name);
+        },
+
+        async pollMessageStatus(company) {
+            return this.pollTaskStatus(company, 'message');
+        },
+
+        getMessageStatusText(company) {
+            return this.getTaskStatusText(company, 'message');
+        },
+
+        isGeneratingMessage(company) {
+            return this.generatingMessages.has(company.name);
+        },
+
+        async pollTaskStatus(company, taskType) {
+            const isMessage = taskType === 'message';
+            const trackingSet = isMessage ? this.generatingMessages : this.researchingCompanies;
+            const taskIdField = isMessage ? 'message_task_id' : 'research_task_id';
+            const statusField = isMessage ? 'message_status' : 'research_status';
+            const errorField = isMessage ? 'message_error' : 'research_error';
+
+            while (trackingSet.has(company.name)) {
+                try {
+                    const response = await fetch(`/api/tasks/${company[taskIdField]}`);
+                    const task = await response.json();
+                    
+                    company[statusField] = task.status;
+                    
+                    if (task.status === 'completed') {
+                        if (isMessage && task.result?.message) {
+                            company.reply_message = task.result.message;
+                        } else if (!isMessage && task.result) {
+                            Object.assign(company, task.result);
+                        }
+                        trackingSet.delete(company.name);
+                        break;
+                    } else if (task.status === 'failed') {
+                        company[errorField] = task.error;
+                        trackingSet.delete(company.name);
+                        break;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (err) {
+                    console.error(`Failed to poll ${taskType} status:`, err);
+                    trackingSet.delete(company.name);
+                    break;
+                }
+            }
+        },
+
+        getTaskStatusText(company, taskType) {
+            const isMessage = taskType === 'message';
+            const status = isMessage ? company.message_status : company.research_status;
+            const error = isMessage ? company.message_error : company.research_error;
+            const action = isMessage ? 'Generation' : 'Research';
+
+            if (error) {
+                return `${action} failed: ${error}`;
+            }
+            switch (status) {
+                case 'pending':
+                    return isMessage ? 'Generating message...' : 'Research pending...';
+                case 'running':
+                    return isMessage ? 'Generating...' : 'Researching...';
+                case 'completed':
+                    return isMessage ? 'Message generated' : 'Research complete';
+                case 'failed':
+                    return `${action} failed`;
+                default:
+                    return '';
+            }
         }
     }));
 });

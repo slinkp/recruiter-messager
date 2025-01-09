@@ -87,9 +87,14 @@ def create_stub_message(company_name: str) -> str:
 @view_config(route_name="generate_message", renderer="json", request_method="POST")
 def generate_message(request):
     company_name = request.matchdict["company_name"]
-    message = create_stub_message(company_name)
-    logger.info(f"Generated message for {company_name}: {message}")
-    return {"message": message}
+    # Create a new task
+    task_id = tasks.task_manager().create_task(
+        tasks.TaskType.GENERATE_REPLY,
+        {"company_name": company_name},
+    )
+    logger.info(f"Generate reply requested for {company_name}, task_id: {task_id}")
+
+    return {"task_id": task_id, "status": tasks.TaskStatus.PENDING.value}
 
 
 @view_config(route_name="generate_message", renderer="json", request_method="PUT")
@@ -136,8 +141,8 @@ def research_company(request):
     return {"task_id": task_id, "status": tasks.TaskStatus.PENDING.value}
 
 
-@view_config(route_name="research_status", renderer="json", request_method="GET")
-def get_research_status(request):
+@view_config(route_name="task_status", renderer="json", request_method="GET")
+def get_task_status(request):
     task_id = request.matchdict["task_id"]
     task = tasks.task_manager().get_task(task_id)
 
@@ -166,7 +171,7 @@ def main(global_config, **settings):
         config.add_route('companies', '/api/companies')
         config.add_route("generate_message", "/api/{company_name}/reply_message")
         config.add_route("research", "/api/{company_name}/research")
-        config.add_route("research_status", "/api/research/{task_id}")
+        config.add_route("task_status", "/api/tasks/{task_id}")
         config.add_static_view(name='static', path='static')
         config.scan()
 
