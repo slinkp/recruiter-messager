@@ -319,7 +319,7 @@ class CompanyRepository:
                     WHERE name = ?
                     """,
                     (
-                        json.dumps(company.details.model_dump()),
+                        json.dumps(company.details.model_dump(), cls=CustomJSONEncoder),
                         company.initial_message,
                         company.reply_message,
                         company.name,
