@@ -166,90 +166,6 @@ def run_in_process(func: Callable, *args, timeout=120, **kwargs) -> Any:
                 process.kill()
 
 
-@disk_cache(CacheStep.BASIC_RESEARCH)
-def initial_research_company(message: str, model: str) -> CompaniesSheetRow:
-    logger.info("Starting initial research...")
-    # TODO: Implement this:
-    # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
-    #   and pass that to company_researcher.py too
-    # - use levels_searcher.py to find salary data
-    row = company_researcher.main(url_or_message=message, model=model, is_url=False)
-
-    now = datetime.datetime.now()
-    # TODO: handle case of company not found
-
-    logger.info("Finding equivalent job levels ...")
-    equivalent_levels = list(
-        run_in_process(levels_searcher.extract_levels, row.name) or []
-    )
-    if equivalent_levels:
-        row.level_equiv = ", ".join(equivalent_levels)
-        delta = datetime.datetime.now() - now
-        logger.info(
-            f"Found equivalent job levels: {row.level_equiv} in {delta.seconds} seconds"
-        )
-    else:
-        logger.info(f"No equivalent job levels found for {row.name}")
-
-    logger.info("Finding salary data ...")
-    now = datetime.datetime.now()
-    salary_data = run_in_process(levels_searcher.main, company_name=row.name) or []
-    salary_data = list(salary_data)  # Convert generator to list if needed
-
-    delta = datetime.datetime.now() - now
-    logger.info(
-        f"Got {len(salary_data)} rows of salary data for {row.name} in {delta.seconds} seconds"
-    )
-
-    if salary_data:
-        # Calculate averages from all salary entries.
-        # TODO: We don't actually want an average, we want the best fit.
-        total_comps = [entry["total_comp"] for entry in salary_data]
-        base_salaries = [entry["salary"] for entry in salary_data if entry["salary"]]
-        equities = [entry["equity"] for entry in salary_data if entry["equity"]]
-        bonuses = [entry["bonus"] for entry in salary_data if entry["bonus"]]
-
-        row.total_comp = (
-            decimal.Decimal(int(sum(total_comps) / len(total_comps)))
-            if total_comps
-            else None
-        )
-        row.base = (
-            decimal.Decimal(int(sum(base_salaries) / len(base_salaries)))
-            if base_salaries
-            else None
-        )
-        row.rsu = (
-            decimal.Decimal(int(sum(equities) / len(equities))) if equities else None
-        )
-        row.bonus = (
-            decimal.Decimal(int(sum(bonuses) / len(bonuses))) if bonuses else None
-        )
-    else:
-        logger.warning(f"No salary data found for {row.name}")
-
-    return row
-
-
-@disk_cache(CacheStep.FOLLOWUP_RESEARCH)
-def followup_research_company(company_info: CompaniesSheetRow) -> CompaniesSheetRow:
-    logger.info(f"Doing followup research on: {company_info}")
-
-    linkedin_contacts = run_in_process(linkedin_searcher.main, company_info.name) or []
-    linkedin_contacts = linkedin_contacts[:4]
-
-    company_info.maybe_referrals = "\n".join(
-        [f"{c['name']} - {c['title']}" for c in linkedin_contacts]
-    )
-    return company_info
-
-
-def is_good_fit(company_info: CompaniesSheetRow) -> bool:
-    # TODO: basic heuristic for now
-    logger.info(f"Checking if {company_info.name} is a good fit...")
-    return True
-
-
 def send_reply(reply: str):
     # TODO: Implement this
     logger.info(f"Sending reply: {reply[:200]}...")
@@ -341,6 +257,7 @@ class EmailResponder:
 
         return old_replies
 
+    @disk_cache(CacheStep.REPLY)
     def generate_reply(self, msg: str) -> str:
         logger.info("Generating reply...")
         result = self.rag.generate_reply(msg)
@@ -451,12 +368,12 @@ class JobSearch:
                 f"==============================\n\nProcessing message:\n\n{content}\n"
             )
             # TODO: pass subject too?
-            company_info = initial_research_company(content, model=args.model)
-            logger.debug(f"Company info after initial research: {company_info}\n\n")
-            generated_reply = self.generate_reply(content)
+
+            company_info = self.research_company(content, model=args.model)
+            logger.info(f"------- RESEARCHED COMPANY:\n{company_info}\n\n")
+
+            generated_reply = self.email_responder.generate_reply(content)
             logger.info(f"------ GENERATED REPLY:\n{generated_reply[:400]}\n\n")
-            if is_good_fit(company_info):
-                company_info = followup_research_company(company_info)
 
             reply = maybe_edit_reply(generated_reply)
             logger.info(f"------ EDITED REPLY:\n{reply}\n\n")
@@ -464,6 +381,105 @@ class JobSearch:
             archive_message(msg)
             add_company_to_spreadsheet(company_info, args)
             logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
+
+    def research_company(self, content: str, model: str) -> CompaniesSheetRow:
+        company_info = self.initial_research_company(content, model=model)
+        logger.debug(f"Company info after initial research: {company_info}\n\n")
+
+        if self.is_good_fit(company_info):
+            company_info = self.followup_research_company(company_info)
+            logger.debug(f"Company info after followup research: {company_info}\n\n")
+
+        return company_info
+
+    @disk_cache(CacheStep.BASIC_RESEARCH)
+    def initial_research_company(self, message: str, model: str) -> CompaniesSheetRow:
+        logger.info("Starting initial research...")
+        # TODO: Implement this:
+        # - If there are attachments to the message (eg .doc or .pdf), extract the text from them
+        #   and pass that to company_researcher.py too
+        # - use levels_searcher.py to find salary data
+        row = company_researcher.main(url_or_message=message, model=model, is_url=False)
+
+        now = datetime.datetime.now()
+        # TODO: handle case of company not found
+
+        logger.info("Finding equivalent job levels ...")
+        equivalent_levels = list(
+            run_in_process(levels_searcher.extract_levels, row.name) or []
+        )
+        if equivalent_levels:
+            row.level_equiv = ", ".join(equivalent_levels)
+            delta = datetime.datetime.now() - now
+            logger.info(
+                f"Found equivalent job levels: {row.level_equiv} in {delta.seconds} seconds"
+            )
+        else:
+            logger.info(f"No equivalent job levels found for {row.name}")
+
+        logger.info("Finding salary data ...")
+        now = datetime.datetime.now()
+        salary_data = run_in_process(levels_searcher.main, company_name=row.name) or []
+        salary_data = list(salary_data)  # Convert generator to list if needed
+
+        delta = datetime.datetime.now() - now
+        logger.info(
+            f"Got {len(salary_data)} rows of salary data for {row.name} in {delta.seconds} seconds"
+        )
+
+        if salary_data:
+            # Calculate averages from all salary entries.
+            # TODO: We don't actually want an average, we want the best fit.
+            total_comps = [entry["total_comp"] for entry in salary_data]
+            base_salaries = [
+                entry["salary"] for entry in salary_data if entry["salary"]
+            ]
+            equities = [entry["equity"] for entry in salary_data if entry["equity"]]
+            bonuses = [entry["bonus"] for entry in salary_data if entry["bonus"]]
+
+            row.total_comp = (
+                decimal.Decimal(int(sum(total_comps) / len(total_comps)))
+                if total_comps
+                else None
+            )
+            row.base = (
+                decimal.Decimal(int(sum(base_salaries) / len(base_salaries)))
+                if base_salaries
+                else None
+            )
+            row.rsu = (
+                decimal.Decimal(int(sum(equities) / len(equities)))
+                if equities
+                else None
+            )
+            row.bonus = (
+                decimal.Decimal(int(sum(bonuses) / len(bonuses))) if bonuses else None
+            )
+        else:
+            logger.warning(f"No salary data found for {row.name}")
+
+        return row
+
+    @disk_cache(CacheStep.FOLLOWUP_RESEARCH)
+    def followup_research_company(
+        self, company_info: CompaniesSheetRow
+    ) -> CompaniesSheetRow:
+        logger.info(f"Doing followup research on: {company_info}")
+
+        linkedin_contacts = (
+            run_in_process(linkedin_searcher.main, company_info.name) or []
+        )
+        linkedin_contacts = linkedin_contacts[:4]
+
+        company_info.maybe_referrals = "\n".join(
+            [f"{c['name']} - {c['title']}" for c in linkedin_contacts]
+        )
+        return company_info
+
+    def is_good_fit(self, company_info: CompaniesSheetRow) -> bool:
+        # TODO: basic heuristic for now
+        logger.info(f"Checking if {company_info.name} is a good fit...")
+        return True
 
 
 def arg_parser():

@@ -12,11 +12,17 @@ logger = logging.getLogger(__name__)
 
 
 class ResearchDaemon:
-    def __init__(self):
+
+    def __init__(
+        self, args: argparse.Namespace, cache_settings: libjobsearch.CacheSettings
+    ):
         self.running = False
-        # Initialize the database through TaskManager
         self.task_mgr = task_manager()
         self.company_repo = models.company_repository()
+        self.jobsearch = libjobsearch.JobSearch(
+            args, loglevel=logging.DEBUG
+        )
+
     def start(self):
         self.running = True
         signal.signal(signal.SIGINT, self.stop)
@@ -56,25 +62,31 @@ class ResearchDaemon:
 
     def do_research(self, company_name: str):
         existing = self.company_repo.get(company_name)
+        content = company_name
         if existing:
+            if existing.initial_message:
+                content = existing.initial_message
+                logger.info(f"Using existing initial message: {content[:400]}")
             # TODO: Update existing company
             logger.info(f"Company {company_name} already exists")
             self.company_repo.delete(existing.name)
         logger.info(f"Creating company {company_name}")
         # TODO: Pass more context from email, etc.
         MODEL = "claude-3-5-sonnet-latest"  # TODO: Make this configurable
-        company_row = libjobsearch.initial_research_company(company_name, model=MODEL)
+        company_row = self.jobsearch.research_company(content, model=MODEL)
         company = models.Company(name=company_name, details=company_row)
         self.company_repo.create(company)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Print verbose logging"
-    )
-    args = parser.parse_args()
+    args = libjobsearch.arg_parser().parse_args()
 
     setup_logging(args.verbose)
-    daemon = ResearchDaemon()
+    cache_args = libjobsearch.CacheSettings(
+        clear_all_cache=args.clear_all_cache,
+        clear_cache=args.clear_cache,
+        cache_until=args.cache_until,
+        no_cache=args.no_cache,
+    )
+    daemon = ResearchDaemon(args, cache_settings=cache_args)
     daemon.start()
