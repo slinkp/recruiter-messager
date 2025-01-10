@@ -379,7 +379,7 @@ class JobSearch:
             company_info = self.research_company(content, model=args.model)
             logger.info(f"------- RESEARCHED COMPANY:\n{company_info}\n\n")
 
-            generated_reply = self.email_responder.generate_reply(content)
+            generated_reply = self.generate_reply(content)
             logger.info(f"------ GENERATED REPLY:\n{generated_reply[:400]}\n\n")
 
             reply = maybe_edit_reply(generated_reply)
@@ -388,6 +388,9 @@ class JobSearch:
             archive_message(msg)
             add_company_to_spreadsheet(company_info, args)
             logger.info(f"Processed message {i+1} of {len(new_recruiter_email)}")
+
+    def generate_reply(self, content: str) -> str:
+        return self.email_responder.generate_reply(content)
 
     def research_company(self, content: str, model: str) -> CompaniesSheetRow:
         company_info = self.initial_research_company(content, model=model)

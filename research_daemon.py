@@ -99,10 +99,12 @@ class ResearchDaemon:
     def do_generate_reply(self, args: dict):
         # TODO: Use LLM to generate reply
         assert "company_name" in args
-        logger.info(f"Generating reply for {args['company_name']}")
-        reply = f"Stub reply for {args['company_name']}"
         company = self.company_repo.get(args["company_name"])
         assert company is not None
+        assert company.initial_message is not None
+        logger.info(f"Generating reply for {args['company_name']}")
+        # TODO: Include more company info context in reply args
+        reply = self.jobsearch.generate_reply(company.initial_message)
         company.reply_message = reply
         self.company_repo.update(company)
         logger.info(f"Updated reply for {args['company_name']}")
