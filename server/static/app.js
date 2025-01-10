@@ -63,13 +63,16 @@ document.addEventListener('alpine:init', () => {
                     
                     const data = await response.json();
                     if (response.ok) {
-                        this.editingCompany.reply_message = data.message;
+                        // Use the server response data directly
+                        Object.assign(this.editingCompany, data);
                         this.cancelEdit();
                     } else {
                         console.error('Failed to save reply:', data.error);
+                        alert(data.error || 'Failed to save reply');
                     }
                 } catch (err) {
                     console.error('Failed to save reply:', err);
+                    alert('Failed to save reply');
                 }
             }
         },

@@ -32,7 +32,7 @@
                           :class="getResearchStatusClass(company)">
                     </span>
                 </div>
-                <template x-if="company.initial_message && !company.reply_message">
+                <template x-if="!company.reply_message">
                     <button 
                         @click="generateReply(company)"
                         :disabled="isGeneratingMessage(company)"
@@ -51,11 +51,9 @@
                     ></span>
                 </template>
                 <template x-if="company.reply_message">
-                    <div>
-                        <div style="display: flex; gap: 1rem;">
-                            <button @click="editReply(company)">Edit reply</button>
-                            <button @click="generateReply(company)">Regenerate reply</button>
-                        </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button @click="editReply(company)">Edit reply</button>
+                        <button @click="generateReply(company)">Regenerate reply</button>
                     </div>
                 </template>
                 <details>
