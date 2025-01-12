@@ -34,7 +34,7 @@ Eg:
   - See some kind of summary of status, TBD
   - for example: "There are 9 un-responded recruiter pings from linkedin"
 - Automated research happens
-  - by default, do all un-researched companies?
+  - OK if i have to kick off each company research, there aren't that many
 - List of results and action items
   - "company foo via linkedin ping"
   - actions: reply (auto w/ confirmation), defer / do nothing, archive / ignore
@@ -59,26 +59,8 @@ Do we need some kind of db tracking status?
   - [ ] Solve problem of linkedin email that are recruiter followup, but gmail doesn't thread them
   - [ ] Solve messages that I've already replied to on linkedin and so aren't in gmail - maybe require manually re-labeling
   - [ ] Iterate on prompt against real recruiter email, until test replies to those usually look good.
-?
   - [ ] Extract data from attachments if any (eg .doc or .pdf)
   - [ ] Extract subject from message too
-- [x] Build a little UX allowing me to approve / edit / send replies
-    - [ ] They should be batched! See "Notes on workflow"
-    - [x] Decide on framework for this. Could be in browser, or just command
-          line. Streamlit?
-    - [x] Chose command line for first pass
-      - [x] Edit reply        
-    - [x] Chose SPWA using Alpine.js and Pico.css for second pass
-    - [ ] Features needed:
-      - [ ] List companies
-        - [ ] Display known data
-        - [ ] Link to original message, if any (maybe just gmail link?)
-        - [ ] "Generate reply" button (or "regenerate")
-        - [ ] Display reply
-        - [ ] "Edit reply" link
-        - [ ] "Send and archive" button
-      - [x] Edit reply
-      - [ ] Confirm reply or skip
 - [ ] Actually send email replies
 - [ ] Re-label replied messages (so we know they don't need looking at again)
 - [ ] Company research: general info
@@ -104,17 +86,47 @@ Do we need some kind of db tracking status?
   - [x] Extract job level comparable to Shopify staff eng
   - [x] Integrate salary with main script, add to spreadsheet
   - [x] Integrate level with main script, add to spreadsheet
-- [ ] Main End-to-end script: decide whether the company is a good fit, yes/no
+- [ ] Automatically decide whether the company is a good fit, yes/no
 - [x] Company research: Find contacts in linkedin search
   - [x] Drive browser
   - [x] Search for 1st degree connections currently at company
   - [x] Integrate with end-to-end flow, add to spreadsheet
-  - [ ] Skip if company not a good fit
+  - [x] Skip if company not a good fit
 - [ ] Company research: Find contacts in recurse
   - [ ] Is there an API? Or drive browser? Is there TOS?
   - [ ] Search for 1st degree connections currently at company
   - [ ] Integrate with end-to-end flow, add to spreadsheet
   - [ ] Skip if company not a good fit
+- [x] Build a little UX allowing me to approve / edit / send replies
+    - [ ] They should be batched! See "Notes on workflow"
+    - [x] Decide on framework for this.
+      - [x] Chose command line for first pass (running libjobsearch.py as a script)
+      - [x] Edit reply
+    - [x] Chose SPWA using Alpine.js and Pico.css for second pass
+    - [ ] Features needed:
+      - [x] List pending companies
+        - [x] Display known data
+        - [ ] Link to original message, if any (maybe just gmail link?)
+        - [x] Research button
+        - [x] "Generate reply" button (and "regenerate")
+        - [x] Display reply
+        - [x] "Edit reply" link
+        - [ ] "Send and archive" button
+        - [ ] Richer data display with links
+      - [x] Edit reply
+      - [ ] Skip replying and archive
+      - [x] Async updates from backend
+        - [x] Chose pyramid for simple REST API backend
+        - [x] Polling the API is fine
+        - [x] Run research in a separate process (research_daemon.py)
+        - [x] Persist company data in a sqlite db
+          - [x] models.py
+          - [x] company_repository.py
+        - [x] Chose a simple task model in db rather than a task queue
+          - [x] task.py and models.py
+          - [x] app uses task.py to create and check on tasks
+          - [x] research_daemon.py uses task.py to run and update tasks
+          - [x] Chose sqlite for task db
 - [ ] Work through the existing backlog with this tool
 - [ ] Keep it at inbox zero until I get a job
 - [ ] Profit
