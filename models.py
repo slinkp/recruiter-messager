@@ -11,6 +11,7 @@ from typing import Any, ClassVar, Iterator, List, Optional
 import dateutil.parser
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
+DEFAULT_CURRENT_STATE = "25. consider applying"
 
 class BaseSheetRow(BaseModel):
     """Base class for spreadsheet rows."""
@@ -143,7 +144,9 @@ class CompaniesSheetRow(BaseSheetRow):
     rc: Optional[bool] = Field(default=None)
     url: Optional[str] = Field(default="")
 
-    current_state: Optional[str] = Field(default=None)  # TODO validate values
+    current_state: Optional[str] = Field(
+        default=DEFAULT_CURRENT_STATE
+    )  # TODO validate other values
     updated: Optional[datetime.date] = Field(default=None)
 
     started: Optional[datetime.date] = Field(default=None)
@@ -369,7 +372,6 @@ SAMPLE_COMPANIES = [
             type="Public",
             valuation="10B",
             url="https://shopify.com",
-            current_state="Active",
             updated=datetime.date(2024, 12, 15),
             eng_size=4000,
             total_size=10000,
@@ -385,7 +387,6 @@ SAMPLE_COMPANIES = [
             type="Private Unicorn",
             valuation="1500M",
             url="https://rippling.com",
-            current_state="Active",
             updated=datetime.date(2024, 10, 10),
             headquarters="New York",
         ),

@@ -500,7 +500,6 @@ def main(argv: list[str]):
         row = models.CompaniesSheetRow(
             name=name,
             updated=datetime.date.today(),
-            current_state="10. consider applying",
             base=Decimal(200),
             rsu=Decimal(100),
             leetcode=True,
