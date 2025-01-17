@@ -94,7 +94,7 @@ Do we need some kind of db tracking status?
   - [ ] Solve messages that I've already replied to on linkedin and so aren't in gmail - maybe require manually re-labeling
   - [ ] Iterate on prompt against real recruiter email, until test replies to those usually look good.
   - [ ] Extract data from attachments if any (eg .doc or .pdf)
-  - [ ] Extract subject from message too
+  - [x] Extract subject from message too
 - [ ] Actually send email replies
 - [ ] Re-label replied messages (so we know they don't need looking at again)
 - [ ] Company research: general info
@@ -131,36 +131,37 @@ Do we need some kind of db tracking status?
   - [ ] Search for 1st degree connections currently at company
   - [ ] Integrate with end-to-end flow, add to spreadsheet
   - [ ] Skip if company not a good fit
-- [x] Build a little UX allowing me to approve / edit / send replies
-    - [ ] They should be batched! See "Notes on workflow"
-    - [x] Decide on framework for this.
-      - [x] Chose command line for first pass (running libjobsearch.py as a script)
-      - [x] Edit reply
-    - [x] Chose SPWA using Alpine.js and Pico.css for second pass
-    - [ ] Features needed:
-      - [x] List pending companies
-        - [x] Display known data
-        - [ ] Link to original message, if any (maybe just gmail link?)
-        - [x] Research button
-        - [x] "Generate reply" button (and "regenerate")
-        - [x] Display reply
-        - [x] "Edit reply" link
-        - [ ] "Send and archive" button
-        - [ ] Richer data display with links
-      - [x] Edit reply
-      - [ ] Skip replying and archive
-      - [x] Async updates from backend
-        - [x] Chose pyramid for simple REST API backend
-        - [x] Polling the API is fine
-        - [x] Run research in a separate process (research_daemon.py)
-        - [x] Persist company data in a sqlite db
-          - [x] models.py
-          - [x] company_repository.py
-        - [x] Chose a simple task model in db rather than a task queue
-          - [x] task.py and models.py
-          - [x] app uses task.py to create and check on tasks
-          - [x] research_daemon.py uses task.py to run and update tasks
-          - [x] Chose sqlite for task db
+- [x] UX: Proof-of-concept command line
+    - [x] Chose command line for first pass (running libjobsearch.py as a script)
+    - [x] Edit reply via texteditor
+- [ ] **UX!** 
+  - [ ] Companies should be batched! See "Notes on workflow"
+  - [x] Decide on framework for this.
+  - [x] Chose SPWA using Alpine.js and Pico.css for second pass
+  - [ ] Manually trigger checking email (with optional max)
+  - [x] List pending companies
+    - [x] Display known data
+    - [ ] Link to original message, if any (maybe just gmail link?)
+  - [x] Research button
+  - [x] "Generate reply" button (and "regenerate")
+    - [x] "Edit reply" button
+    - [x] Display reply
+      - [ ] Show recruiter message above reply
+    - [ ] "Send and archive" button
+  - [ ] Richer data display with links
+  - [x] Async updates from backend
+    - [x] Chose pyramid for simple REST API backend
+    - [x] Polling the API is fine
+    - [x] Run research in a separate process (research_daemon.py)
+    - [x] Persist company data
+      - [x] chose sqlite db
+      - [x] models.py
+      - [x] simple repository implementation
+    - [x] Chose a simple task model in db rather than a task queue
+      - [x] task.py and models.py
+      - [x] app uses task.py to create and check on tasks
+      - [x] research_daemon.py uses task.py to run and update tasks
+      - [x] Chose sqlite for task db
 - [ ] Work through the existing backlog with this tool
 - [ ] Keep it at inbox zero until I get a job
 - [ ] Profit
