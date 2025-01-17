@@ -195,11 +195,51 @@ class GmailRepliesSearcher:
     def get_new_recruiter_messages(self, max_results: int = 10) -> list[dict]:
         """
         Get new messages from recruiters that we haven't replied to yet.
+        Combines messages in each thread and returns a list of dicts.
+
+        Includes latest subject.
         """
         logger.info(f"Getting {max_results} new recruiter messages...")
-        results = self.search_and_get_details(RECRUITER_MESSAGES_QUERY, max_results)
-        logger.info(f"...Got {len(results)} raw recruiter messages")
-        return results
+        message_dicts = self.search_and_get_details(
+            RECRUITER_MESSAGES_QUERY, max_results
+        )
+        logger.info(f"...Got {len(message_dicts)} raw recruiter messages")
+        content_by_thread = defaultdict(list)
+        for msg_dict in message_dicts:
+            thread_id = msg_dict["threadId"]
+            content = self.extract_message_content(msg_dict)
+            content = self.clean_quoted_text(content)
+            date = msg_dict["internalDate"]
+            content_by_thread[thread_id].append((date, content, msg_dict))
+
+        combined_messages = []
+        for thread_id, msg_list in content_by_thread.items():
+            # Sort a thread by date, oldest first.
+            msg_list.sort(key=lambda x: x[0])
+            combined_msg = msg_list[-1][-1].copy()  # Use the latest dict
+            # Concatenate the text content of all messages in the thread.
+            # And the oldest message's subject.
+            # TODO: Linkedin subjects may be redundant copy of message content,
+            # but that's probably ok
+            subject = self.get_subject(msg_list[0][-1]).strip()
+            combined_content = []
+            if subject:
+                subject = subject.strip() + "\n\n"
+                combined_content.append(subject)
+            combined_content.extend([mdict[1] for mdict in msg_list])
+            if len(combined_content) > 1:
+                for i, content in enumerate(combined_content):
+                    logger.debug(f"Thread {thread_id} content {i}:\n{content[:200]}...")
+
+            # TODO: Add text extracted from attached PDFs, docx, etc.
+            combined_msg["combined_content"] = "\n\n".join(combined_content)
+            combined_messages.append(combined_msg)
+
+        combined_messages.sort(key=lambda x: int(x["internalDate"]), reverse=True)
+        logger.info(
+            f"Got {len(message_dicts)} new recruiter messages in {len(combined_messages)} threads"
+        )
+        return combined_messages
 
 
 if __name__ == "__main__":

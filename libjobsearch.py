@@ -10,7 +10,6 @@ import re
 import subprocess
 import tempfile
 import time
-from collections import defaultdict
 from enum import IntEnum
 from functools import wraps
 from multiprocessing import Process, Queue
@@ -272,46 +271,14 @@ class EmailResponder:
         return result
 
     @disk_cache(CacheStep.GET_MESSAGES)
-    def get_new_recruiter_messages(
-        self, max_results: int = 100
-    ) -> list[dict[str, Any]]:
+    def get_new_recruiter_messages(self, max_results: int = 100) -> list[str]:
         logger.info(f"Getting {max_results} new recruiter messages")
-        message_dicts = self.email_client.get_new_recruiter_messages(
-            max_results=max_results
-        )
-        logger.debug(f" Email client got {len(message_dicts)} new recruiter messages")
-        # TODO: Move this to email_client.py
-        # TODO: solve for linkedin's failure to thread emails from DMs
-        # TODO: solve for linkedin's stupidly threading "join your network" emails from different people
-
-        # Combine messages in each thread
-        content_by_thread = defaultdict(list)
-        for msg in message_dicts:
-            thread_id = msg["threadId"]
-            content = self.email_client.extract_message_content(msg)
-            content = self.email_client.clean_quoted_text(content)
-            date = msg["internalDate"]
-            content_by_thread[thread_id].append((date, content, msg))
-
-        combined_messages = []
-        for thread_id, msg_list in content_by_thread.items():
-            # Sort a thread by date, oldest first.
-            msg_list.sort(key=lambda x: x[0])
-            combined_msg = msg_list[-1][-1].copy()  # Use the latest dict
-            # Concatenate the text content of all messages in the thread
-            combined_content = [mdict[1] for mdict in msg_list]
-            if len(combined_content) > 1:
-                for i, content in enumerate(combined_content):
-                    logger.debug(f"Thread {thread_id} content {i}:\n{content[:200]}...")
-
-            combined_msg["combined_content"] = "\n\n".join(combined_content)
-            combined_messages.append(combined_msg)
-
-        combined_messages.sort(key=lambda x: int(x["internalDate"]), reverse=True)
-        logger.info(
-            f"Got {len(message_dicts)} new recruiter messages in {len(combined_messages)} threads"
-        )
-        return combined_messages
+        return [
+            msg["combined_content"].strip()
+            for msg in self.email_client.get_new_recruiter_messages(
+                max_results=max_results
+            )
+        ]
 
 
 def add_company_to_spreadsheet(
@@ -353,10 +320,7 @@ class JobSearch:
     def main(self):
         args = self.args
         if args.test_messages:
-            new_recruiter_email = [
-                {"combined_content": msg, "internalDate": "0"}
-                for msg in args.test_messages
-            ]
+            new_recruiter_email = args.test_messages
         else:
             logger.debug("Getting new recruiter messages...")
             new_recruiter_email = self.email_responder.get_new_recruiter_messages(
@@ -366,7 +330,7 @@ class JobSearch:
 
         for i, msg in enumerate(new_recruiter_email):
             logger.info(f"Processing message {i+1} of {len(new_recruiter_email)}...")
-            content = msg["combined_content"].strip()
+            content = msg.strip()
             if not content:
                 logger.warning("Empty message, skipping")
                 continue
