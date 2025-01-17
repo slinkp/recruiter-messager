@@ -442,19 +442,17 @@ class MainTabCompaniesClient(BaseGoogleSheetClient):
 
 
 class Config:
-    # My companies sheet:
-    # For real:
-    # https://docs.google.com/spreadsheets/d/1_MXPVn99e3i3MTGFVrBD73T-AwCKWuNS8P34eEI-SA4/edit?gid=0#gid=0
-    SHEET_DOC_ID = "1_MXPVn99e3i3MTGFVrBD73T-AwCKWuNS8P34eEI-SA4"
-    TAB_1_GID = "0"  # Main tab for companies
-    TAB_1_RANGE = "Active!A3:AE"  # Remember ranges are half-open
+    # My companies sheet
+    SHEET_DOC_ID = os.environ["SHEET_DOC_ID"]
+    TAB_1_GID = os.environ["TAB_1_GID"]
+    TAB_1_RANGE = os.environ["TAB_1_RANGE"]
 
 
 class TestConfig(Config):
-    # FOr testing:
-    # https://docs.google.com/spreadsheets/d/1uDHheC0LnGGQfS3X7SeRGi0XM8dBwXho7bu-MfaYZpY/edit?gid=0#gid=0
-    SHEET_DOC_ID = "1uDHheC0LnGGQfS3X7SeRGi0XM8dBwXho7bu-MfaYZpY"
-    TAB_1_GID = "925425851"
+    # Separate spreadsheet for experimenting with new features
+    SHEET_DOC_ID = os.environ["TEST_SHEET_DOC_ID"]
+    TAB_1_GID = os.environ["TEST_TAB_1_GID"]
+    TAB_1_RANGE = os.environ["TEST_TAB_1_RANGE"]
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
