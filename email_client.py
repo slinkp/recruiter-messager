@@ -110,7 +110,7 @@ class GmailRepliesSearcher:
         return text
 
     def _is_garbage_line(self, line):
-        linkedin_garbage_lines = (
+        linkedin_garbage_lines_starters = (
             "This email was intended for",
             "Get the new LinkedIn",
             "Also available on mobile",
@@ -118,10 +118,18 @@ class GmailRepliesSearcher:
             "See all connections in common",
             "View profile:",
             "Accept:http",
+            "You have an invitation",
             "-------------------------------",
         )
-        for garbage in linkedin_garbage_lines:
+        for garbage in linkedin_garbage_lines_starters:
             if line.startswith(garbage):
+                return True
+        linkedin_garbage_lines_exact = [
+            "Reply",
+            "You have an invitation",
+        ]
+        for garbage in linkedin_garbage_lines_exact:
+            if line == garbage:
                 return True
         return False
 
