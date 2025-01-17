@@ -430,6 +430,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--clear-data", action="store_true", help="Clear existing data")
     parser.add_argument("--sample-data", action="store_true", help="Load sample data")
+    parser.add_argument("--dump", action="store_true", help="Dump data to stdout")
     args = parser.parse_args()
 
-    company_repository(clear_data=args.clear_data, load_sample_data=args.sample_data)
+    repo = company_repository(
+        clear_data=args.clear_data, load_sample_data=args.sample_data
+    )
+    if args.dump:
+        for company in repo.get_all():
+            print(f"Company: {company.name}")
+            print(company.model_dump_json(indent=2))
+            print()
