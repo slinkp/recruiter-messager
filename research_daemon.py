@@ -82,9 +82,11 @@ class ResearchDaemon:
         company_name = args["company_name"]
         existing = self.company_repo.get(company_name)
         content = company_name
+        initial_message = None
         if existing:
-            if existing.initial_message:
-                content = existing.initial_message
+            initial_message = existing.initial_message
+            if initial_message:
+                content = initial_message
                 logger.info(f"Using existing initial message: {content[:400]}")
             # TODO: Update existing company
             logger.info(f"Company {company_name} already exists")
@@ -93,7 +95,11 @@ class ResearchDaemon:
         # TODO: Pass more context from email, etc.
         MODEL = "claude-3-5-sonnet-latest"  # TODO: Make this configurable
         company_row = self.jobsearch.research_company(content, model=MODEL)
-        company = models.Company(name=company_name, details=company_row)
+        company = models.Company(
+            name=company_name,
+            details=company_row,
+            initial_message=initial_message,
+        )
         self.company_repo.create(company)
 
     def do_generate_reply(self, args: dict):
