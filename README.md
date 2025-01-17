@@ -1,3 +1,37 @@
+# TL;DR
+
+This is a tool to help me find and apply to highly relevant jobs.
+
+It is also an excuse to learn AI techniques like RAG, and use generative coding tools to get things done.
+
+## Install
+
+Only tested on MacOS.
+```console
+pip install -r requirements.txt
+``` 
+
+
+## Run
+
+TODO: Document the necessary environment variables you must export.
+I use [direnv](https://direnv.net/) which loads them from an `.envrc` file (not provided)
+
+```console
+# In one terminal
+python research_daemon.py
+```
+
+```console
+# Run the web app in another terminal
+python server/app.py
+```
+
+View the web app at http://localhost:8080
+
+Both of them have command line interfaces; explore via `-h` or `--help`.
+
+
 # Problem 1: Automatic my recruiter email replies via gmail and RAG
 
 Most of the recruiter mail I get is for positions that aren't a good match.
