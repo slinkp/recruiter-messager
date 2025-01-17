@@ -2,7 +2,8 @@ import base64
 import logging
 import os
 import re
-from typing import List, Tuple
+import textwrap
+from collections import defaultdict
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -171,7 +172,7 @@ class GmailRepliesSearcher:
 
     def get_my_replies_to_recruiters(
         self, query: str = RECRUITER_REPLIES_QUERY, max_results: int = 10
-    ) -> List[Tuple[str, str, str]]:
+    ) -> list[tuple[str, str, str]]:
         results = self.search_and_get_details(query, max_results)
         print(f"Got {len(results)} messages")
         processed_messages = []
@@ -191,7 +192,7 @@ class GmailRepliesSearcher:
         processed_messages.sort(reverse=True)
         return [msg for _, msg in processed_messages]
 
-    def get_new_recruiter_messages(self, max_results: int = 10):
+    def get_new_recruiter_messages(self, max_results: int = 10) -> list[dict]:
         """
         Get new messages from recruiters that we haven't replied to yet.
         """
@@ -206,7 +207,6 @@ if __name__ == "__main__":
     query = RECRUITER_REPLIES_QUERY
     processed_messages = searcher.get_my_replies_to_recruiters(query, max_results=10)
     processed_messages = processed_messages[:3]
-    import textwrap
 
     term_width = 75
     max_lines = 4
