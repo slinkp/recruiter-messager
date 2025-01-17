@@ -158,11 +158,16 @@ class GmailRepliesSearcher:
             quoted_text = ""
         return reply_text, quoted_text
 
-    def get_subject(self, message):
+    def get_subject(self, message) -> str:
+        garbage_subjects = [
+            "You have an invitation",
+        ]
         for header in message["payload"]["headers"]:
             if header["name"].lower() == "subject":
-                return header["value"]
-        return "No Subject"
+                subject = header["value"].strip()
+                if subject and subject not in garbage_subjects:
+                    return subject
+        return "(No Subject)"
 
     def get_my_replies_to_recruiters(
         self, query: str = RECRUITER_REPLIES_QUERY, max_results: int = 10
