@@ -242,23 +242,72 @@ class GmailRepliesSearcher:
         return combined_messages
 
 
-if __name__ == "__main__":
+def main_demo(
+    do_replies: bool, do_recruiter_messages: bool, max_lines: int, max_results: int
+):
     searcher = GmailRepliesSearcher()
     query = RECRUITER_REPLIES_QUERY
-    processed_messages = searcher.get_my_replies_to_recruiters(query, max_results=10)
-    processed_messages = processed_messages[:3]
 
     term_width = 75
-    max_lines = 4
-    for subject, recruiter_message, my_reply in processed_messages:
+
+    processed_messages = []
+    recruiter_messages = []
+    if do_replies:
+        processed_messages = searcher.get_my_replies_to_recruiters(
+            query, max_results=max_results + 10
+        )
+        processed_messages = processed_messages[:max_results]
+
+    if do_recruiter_messages:
+        recruiter_messages = searcher.get_new_recruiter_messages(
+            max_results=max_results
+        )
+
+    for i, msg in enumerate(recruiter_messages):
+        print(f"Recruiter Message {i}:")
+        print()
+        msg = textwrap.fill(
+            msg["combined_content"], width=term_width, max_lines=max_lines
+        )
+        print(msg)
+        print()
+        print("-" * term_width)
+        print()
+
+    for i, (subject, recruiter_message, my_reply) in enumerate(processed_messages):
         subject = textwrap.fill(subject, width=term_width)
         recruiter_message = textwrap.fill(
             recruiter_message, width=term_width, max_lines=max_lines
         )
         my_reply = textwrap.fill(my_reply, width=term_width, max_lines=max_lines)
-        print(f"Subject: {subject}")
+        print(f"Message {i} Subject: {subject}")
         print(f"\nRecruiter Message:\n{recruiter_message}")
         print(f"\nMy Reply:\n{my_reply}")
         print()
         print("-" * term_width)
         print()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--replies", action="store_true")
+    parser.add_argument("--recruiter-messages", action="store_true")
+    parser.add_argument("--max-lines", type=int, default=10)
+    parser.add_argument("--max-results", type=int, default=10)
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
+    if not args.replies and not args.recruiter_messages:
+        print("Please specify at least one of --replies or --recruiter-messages")
+        exit(1)
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    main_demo(
+        do_replies=args.replies,
+        do_recruiter_messages=args.recruiter_messages,
+        max_lines=args.max_lines,
+        max_results=args.max_results,
+    )
